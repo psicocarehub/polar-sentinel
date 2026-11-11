@@ -11,6 +11,12 @@ ordens dirigidas à IA que vai ler a peça e exige aprovação humana de uso ún
 antes de qualquer ação irreversível. O núcleo é Python puro, sem dependências, e
 as etapas de defesa não fazem chamada de rede. Licença Apache 2.0.
 
+**Teste no navegador:** https://psicocarehub.github.io/polar-sentinel/ traz petições
+de exemplo com os comandos que tribunais publicaram escondidos no PDF. O arquivo é
+lido no seu navegador e não é enviado a nenhum servidor.
+
+*English summary [below](#english-summary).*
+
 ## O que ele pega, medido
 
 No corpus em que as regras foram escritas, o benchmark dá 100%. Esse número não
@@ -187,6 +193,19 @@ desenvolvimento pode ser lida para corrigir regras, a de teste só recebe medida
 O conjunto cego 2 só continua valendo como medida enquanto ninguém ajustar
 regras olhando para ele. Quem alterar o detector deve trazer um conjunto novo.
 
+## Demonstração no navegador
+
+A página https://psicocarehub.github.io/polar-sentinel/ roda o Polar Sentinel
+dentro do navegador (com stlite e Pyodide) e é publicada a cada mudança em
+`main`. O código está em [demo_web/](demo_web/); para montar e testar localmente:
+
+```bash
+pip install -e ".[lab]"
+python demo_web/gerar_exemplos.py      # PDFs de exemplo
+bash demo_web/montar.sh                # monta o site em _site/
+python -m http.server --directory _site
+```
+
 ## Laboratório visual e PDFs de teste
 
 ```bash
@@ -234,6 +253,40 @@ Estevam, M. A. S. (2026). *Polar Sentinel: o que um filtro determinístico de
 injeção de comandos pega, e o que deixa passar, em documentos jurídicos
 brasileiros*. Zenodo. https://doi.org/10.5281/zenodo.24143886 (o DOI aponta sempre para a
 versão mais recente). Veja [CITATION.cff](CITATION.cff).
+
+## English summary
+
+Polar Sentinel is an open (Apache 2.0) defense layer against prompt injection in
+documents read by AI systems in Brazilian courts. In 2026, several Brazilian
+courts found petitions carrying hidden orders addressed to the AI that reads the
+case file: white text on a white page, text in a 0.8 pt font, text in the color
+of the footer band. Sentinel inspects the PDF for text a human reader cannot see,
+strips hidden channels, looks for orders addressed to the AI, and requires a
+single-use human approval before any irreversible action.
+
+Measured on data it was not written for (details in
+[docs/AVALIACAO.md](docs/AVALIACAO.md), in Portuguese):
+
+* **Real Brazilian legal texts:** 2 false positives in 4,007 court decisions,
+  headnotes and petition templates (0.05%; the previous version flagged 20.3%).
+* **Real commands published by Brazilian courts:** 9 of 10 caught in plain text
+  after tuning on them (2 of 10 before), and 30 of 30 when hidden in a PDF the
+  way the court reports describe.
+* **LLMail-Inject attack emails:** 56.8% caught.
+* **Blind set in Brazilian legal Portuguese:** 55.0% of 60 attacks caught
+  (95% CI 43 to 67), with 6.7% false positives on 60 deliberately hard
+  legitimate documents.
+
+The practical reading: the attack courts are actually seeing is hidden by form,
+and form is cheap to detect precisely. Orders written in ordinary language, with
+nothing hidden, get through about half the time, so this is triage, not a
+guarantee; the human approval gate is the protection that does not depend on the
+detector being right.
+
+Try it in the browser: https://psicocarehub.github.io/polar-sentinel/ (the file
+is processed locally and never uploaded). Full paper (Portuguese):
+[paper/polar-sentinel.pdf](paper/polar-sentinel.pdf). Cite:
+https://doi.org/10.5281/zenodo.24143886
 
 ## Licença
 

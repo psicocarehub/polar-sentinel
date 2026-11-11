@@ -27,3 +27,6 @@ env/
 # Artefatos locais de teste que nao devem ir ao repositorio
 polar_sentinel/attacks/out/
 *.local.pdf
+
+# Demonstração montada
+_site/

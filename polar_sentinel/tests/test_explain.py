@@ -27,9 +27,9 @@ def test_ataque_e_perigoso_e_explicado_em_linguagem_simples():
     )
     assert exp.veredito == "PERIGOSO"
     # As frases devem ser legiveis, nao codigos tecnicos.
-    assert any("invisiveis" in s for s in exp.o_que_estava_escondido)
+    assert any("invisíveis" in s for s in exp.o_que_estava_escondido)
     assert any("ignorar" in s for s in exp.o_que_estava_escondido)
-    assert any("L4" in s or "aprovacao humana" in s for s in exp.como_identificamos)
+    assert any("L4" in s or "aprovação humana" in s for s in exp.como_identificamos)
     assert exp.recomendacao
 
 

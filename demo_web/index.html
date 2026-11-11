@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Polar Sentinel: demonstração</title>
+  <meta name="description" content="Veja o que uma IA leria num documento e você não vê. Demonstração do Polar Sentinel, que roda no seu navegador." />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@stlite/browser@1.11.0/build/stlite.css" />
+  <style>
+    body { margin: 0; background: #ffffff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    #carregando { max-width: 640px; margin: 18vh auto 0; padding: 0 16px; color: #16243f; }
+    #carregando h1 { font-size: 1.6rem; margin: 0 0 8px; }
+    #carregando p { color: #475569; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div id="carregando">
+    <h1>Polar Sentinel</h1>
+    <p>Preparando a demonstração no seu navegador. Na primeira visita leva de 20 a 40 segundos,
+      porque o programa inteiro roda aqui, sem enviar seus arquivos a nenhum servidor.</p>
+  </div>
+  <div id="app"></div>
+  <script type="module">
+    import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@1.11.0/build/stlite.js";
+
+    const base = new URL(".", location.href);
+    const pacote = await (await fetch(new URL("pacote.json", base))).json();
+    const arquivos = { "app.py": { url: new URL("app.py", base).href } };
+    for (const nome of pacote.exemplos) {
+      arquivos["exemplos/" + nome] = { url: new URL("exemplos/" + nome, base).href };
+    }
+    document.getElementById("carregando").remove();
+    mount(
+      {
+        requirements: ["pypdf==7.0.1", new URL(pacote.roda, base).href],
+        entrypoint: "app.py",
+        files: arquivos,
+        streamlitConfig: { "browser.gatherUsageStats": false, "client.toolbarMode": "viewer" },
+      },
+      document.getElementById("app"),
+    );
+  </script>
+</body>
+</html>
