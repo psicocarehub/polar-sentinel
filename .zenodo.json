@@ -1,0 +1,24 @@
+{
+  "title": "Polar Sentinel: o que um filtro determinístico de injeção de comandos pega, e o que deixa passar, em documentos jurídicos brasileiros",
+  "description": "<p>Camada aberta de defesa contra injeção de comandos (prompt injection) em documentos lidos por sistemas de IA do Judiciário brasileiro: inspeção de PDF em busca de texto que o leitor humano não vê, leitura segura, detector de ordens dirigidas à IA e aprovação humana de uso único.</p><p>Este registro traz o código, os dez comandos reais publicados por tribunais brasileiros em 2026 (com a fonte de cada um), dois conjuntos cegos em português jurídico, o protocolo de avaliação e o texto completo. Em 4.007 textos jurídicos reais a versão 0.4.0 sinaliza 0,05% por engano; pega 9 dos 10 comandos reais no texto e os 30 arquivos de teste em que eles estão escondidos no PDF; em um conjunto cego de 60 ataques, pega 55,0%, com 6,7% de falsos positivos. Os limites da medida estão em docs/AVALIACAO.md.</p>",
+  "upload_type": "software",
+  "creators": [
+    {
+      "name": "Estevam, Marcio Andre de Souza",
+      "orcid": "0009-0004-8551-3231",
+      "affiliation": "Meridian AI Labs"
+    }
+  ],
+  "license": "Apache-2.0",
+  "access_right": "open",
+  "language": "por",
+  "keywords": [
+    "prompt injection",
+    "LLM security",
+    "AI safety",
+    "Judiciário",
+    "legal documents",
+    "Brazil",
+    "CNJ 615"
+  ]
+}
