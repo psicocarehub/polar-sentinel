@@ -6,6 +6,7 @@ version: 0.4.0
 date-released: 2026-11-11
 license: Apache-2.0
 repository-code: "https://github.com/psicocarehub/polar-sentinel"
+doi: "10.5281/zenodo.24143886"
 authors:
   - family-names: Estevam
     given-names: Marcio Andre de Souza

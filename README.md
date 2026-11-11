@@ -1,5 +1,7 @@
 # Polar Sentinel
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24143886.svg)](https://doi.org/10.5281/zenodo.24143886)
+
 Camada aberta de defesa contra injeção de comandos (prompt injection) em
 documentos lidos por sistemas de IA do Judiciário brasileiro.
 
@@ -230,7 +232,8 @@ Este repositório reúne apenas vetores já descritos em literatura pública.
 
 Estevam, M. A. S. (2026). *Polar Sentinel: o que um filtro determinístico de
 injeção de comandos pega, e o que deixa passar, em documentos jurídicos
-brasileiros*. Veja [CITATION.cff](CITATION.cff).
+brasileiros*. Zenodo. https://doi.org/10.5281/zenodo.24143886 (o DOI aponta sempre para a
+versão mais recente). Veja [CITATION.cff](CITATION.cff).
 
 ## Licença
 
