@@ -60,6 +60,11 @@ MOTIVO_OCULTO = {
     "cor_do_fundo": "na mesma cor do fundo (por exemplo, branco sobre a página branca)",
     "fonte_minuscula": "em letra menor que 2 pontos, impossível de ler",
     "fora_da_pagina": "posicionado fora da área visível da página",
+    "modo_invisivel": "em modo de renderização invisível",
+    "transparente": "transparente",
+    "coberto_ou_recortado": "coberto por outro objeto ou cortado",
+    "baixo_contraste": "em contraste tão baixo que mal se lê",
+    "ocr_divergente": "na camada de OCR, diferente do que a imagem mostra",
 }
 
 MOTIVO_PDF = {
@@ -67,6 +72,13 @@ MOTIVO_PDF = {
     "comando_em_metadado": "Há uma ordem dirigida à IA nos dados internos do arquivo (título, autor).",
     "texto_em_fonte_minuscula": "Há texto em letra minúscula, que nenhuma pessoa consegue ler.",
     "ordem_em_texto_oculto": "Há uma ordem dirigida à IA escrita onde a pessoa não vê.",
+    "ordem_em_anotacao": "Há uma ordem dirigida à IA numa anotação do PDF.",
+    "ordem_em_campo_de_formulario": "Há uma ordem dirigida à IA num campo de formulário.",
+    "ordem_em_camada_desligada": "Há uma ordem dirigida à IA numa camada que abre desligada.",
+    "ordem_em_arquivo_embutido": "Há uma ordem dirigida à IA num arquivo anexado dentro do PDF.",
+    "ordem_em_javascript": "Há uma ordem dirigida à IA em código JavaScript.",
+    "ordem_em_link": "Há uma ordem dirigida à IA no endereço de um link.",
+    "ordem_em_unicode_invisivel": "Há uma ordem dirigida à IA em caracteres Unicode invisíveis.",
 }
 
 st.set_page_config(page_title="Polar Sentinel: demonstração", page_icon="🛡️", layout="centered")

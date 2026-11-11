@@ -22,9 +22,13 @@ sinaliza; texto na cor do fundo ou fora da pagina sinaliza quando traz uma
 ordem (imperativo, mencao a IA ou qualquer sinal do detector). O trecho oculto
 e devolvido para ser registrado nos autos, nunca descartado.
 
-Limites: fundo feito de imagem nao e visto (texto branco sobre foto escura
-parece oculto, por isso a exigencia de ordem); texto escondido atras de outro
-objeto e texto em anotacoes ou formularios nao sao analisados.
+Com pypdfium2 e numpy instalados, a inspecao passa a medir a pagina
+renderizada (reference/pdf_percepcao.py): o fundo deixa de ser adivinhado, e
+texto atras de imagem, recortado, transparente ou em modo invisivel tambem e
+achado. Sem eles, vale a leitura do conteudo descrita acima, que nao ve fundo
+feito de imagem nem texto atras de outro objeto. Nos dois casos, anotacoes,
+campos de formulario, camadas desligadas, arquivos embutidos, JavaScript e
+metadados sao lidos por reference/pdf_estrutura.py.
 
 Precisa de pypdf (pip install pypdf).
 """
@@ -34,7 +38,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from polar_sentinel.reference.injection_detector import (
     _AI_TERM,
@@ -42,6 +46,8 @@ from polar_sentinel.reference.injection_detector import (
     detect_suspicious_patterns,
     fold,
 )
+from polar_sentinel.reference.pdf_estrutura import Achado, inspecionar_estrutura
+from polar_sentinel.reference.sanitizer import sanitize_with_audit
 
 Color = Tuple[float, float, float]
 
@@ -61,6 +67,34 @@ _NO_FILL_OPS = {b"n", b"S", b"s"}
 _ORDER_RE = re.compile(
     r"\b(?:" + _IMPERATIVE + r")\b|\b(?:" + _AI_TERM + r")|\b(?:chat|gpt|chatgpt|inteligencia artificial)\b"
 )
+# Os mesmos sinais com as palavras partidas ("pet ição", "in teligência"): o
+# texto oculto e comparado tambem sem espacos nem pontuacao. Radicais curtos
+# ("gpt", "llm") ficam de fora, porque aparecem por acaso em blocos de base64.
+_RADICAIS = re.compile(
+    "inteligenciaartificial|agentedeia|modelodeia|modelodelinguagem|chatgpt|sistemadeia|"
+    "sistemasdeia|sistemaautomat|leitorautomat|leitoresautomat|assistenteautomat|"
+    "assistentevirtual|agenteautomat|ferramentadeia|"
+    "defira|indefira|acolha|julgue|redija|ignore|desconsidere|considere|conteste|impugne|"
+    "negue|interprete|favoravel|integralmenteprovido|conhecidoeprovido|sevoceeum|"
+    "conceda|classifique|sugira|declare|registre"
+)
+# Termo de IA, para os canais em que imperativo sozinho e comum (metadados).
+_TERMO_DE_IA = re.compile(
+    r"\b(?:" + _AI_TERM + r")|\b(?:chat|gpt|chatgpt|llm|ia|leitor(?:es)? automatizad\w*|"
+    r"sistemas? automatizad\w*)\b"
+)
+# Bloco sem espaco maior que isto nao e palavra partida (base64, hash).
+_MAX_PEDACO = 20
+# Canais fora da pagina em que uma ordem sinaliza o documento.
+_CANAIS_COM_TEXTO = {
+    "anotacao": "ordem_em_anotacao",
+    "campo_de_formulario": "ordem_em_campo_de_formulario",
+    "camada_desligada": "ordem_em_camada_desligada",
+    "arquivo_embutido": "ordem_em_arquivo_embutido",
+    "javascript": "ordem_em_javascript",
+    "link": "ordem_em_link",
+    "metadado": "comando_em_metadado",
+}
 
 
 @dataclass
@@ -70,6 +104,9 @@ class HiddenSpan:
     page: int
     text: str
     reason: str
+    # Contraste, tamanho, cores, opacidade, modo, rotacao e posicao, quando a
+    # pagina foi renderizada.
+    medidas: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -79,6 +116,9 @@ class PdfInspection:
     visible_text: str
     hidden_spans: List[HiddenSpan] = field(default_factory=list)
     metadata_text: str = ""
+    achados: List[Achado] = field(default_factory=list)
+    motor: str = "conteudo"
+    paginas: int = 0
 
     @property
     def hidden_text(self) -> str:
@@ -92,6 +132,9 @@ class PdfVerdict:
     flagged: bool
     reasons: List[str]
     inspection: PdfInspection
+    # O que merece olhar humano sem sinalizar: texto oculto sem ordem,
+    # JavaScript, anexos, revisoes.
+    atencao: List[str] = field(default_factory=list)
 
 
 def _to_rgb(values: Sequence[Any]) -> Optional[Color]:
@@ -184,11 +227,60 @@ class _PageState:
             self.visible.append(text)
 
 
-def inspect_pdf(source: Union[str, Path, Any]) -> PdfInspection:
-    """Le um PDF e separa o texto visivel do texto oculto."""
+def tem_ordem(texto: str, stage: str = "entrada") -> bool:
+    """Ha ordem dirigida a IA, mesmo com as palavras partidas ou letras separadas?"""
+    texto = sanitize_with_audit(texto).text  # tira largura zero entre as letras
+    dobrado = fold(texto)
+    pedacos = " ".join(p for p in dobrado.split() if len(p) <= _MAX_PEDACO)
+    if _ORDER_RE.search(dobrado) or _RADICAIS.search(re.sub(r"[^a-z]", "", pedacos)):
+        return True
+    return detect_suspicious_patterns(texto, stage)[0] > 0.2
+
+
+def dirigido_a_ia(texto: str, stage: str = "entrada") -> bool:
+    """Ordem com destinatario de IA explicito, para canais onde imperativo e comum."""
+    texto = sanitize_with_audit(texto).text
+    return bool(_TERMO_DE_IA.search(fold(texto))) and tem_ordem(texto, stage)
+
+
+def parece_texto(texto: str) -> bool:
+    """Texto que um modelo leria como lingua, e nao glifo sem mapeamento."""
+    visiveis = [ch for ch in texto if not ch.isspace()]
+    if not visiveis:
+        return False
+    letras = sum(ch.isalpha() for ch in visiveis)
+    palavras = [p for p in re.findall(r"[^\W\d_]{3,}", texto) if re.search(r"[aeiouáéíóúâêôãõ]", p, re.I)]
+    return letras / len(visiveis) >= 0.6 and len(palavras) >= 2
+
+
+def _ler_bytes(source: Union[str, Path, bytes, Any]) -> bytes:
+    if isinstance(source, (bytes, bytearray)):
+        return bytes(source)
+    if isinstance(source, (str, Path)):
+        return Path(source).read_bytes()
+    pos = source.tell() if hasattr(source, "tell") else None
+    dados = source.read()
+    if pos is not None and hasattr(source, "seek"):
+        source.seek(pos)
+    return dados
+
+
+def _pela_renderizacao(dados: bytes) -> Tuple[str, List[HiddenSpan], int]:
+    from polar_sentinel.reference.pdf_percepcao import agrupar, perceber_pdf, texto_visivel
+
+    paginas = perceber_pdf(dados)
+    visivel = "\n".join(texto_visivel(p) for p in paginas)
+    ocultos = [HiddenSpan(t["pagina"], t["texto"], t["motivo"], t["medidas"])
+               for p in paginas for t in agrupar(p) if t["motivo"] != "camada_ocr"]
+    return visivel, ocultos, len(paginas)
+
+
+def _pelo_conteudo(dados: bytes) -> Tuple[str, List[HiddenSpan], int]:
+    import io
+
     from pypdf import PdfReader
 
-    reader = PdfReader(str(source) if isinstance(source, (str, Path)) else source)
+    reader = PdfReader(io.BytesIO(dados))
     visible: List[str] = []
     hidden: List[HiddenSpan] = []
     for number, page in enumerate(reader.pages, start=1):
@@ -197,35 +289,79 @@ def inspect_pdf(source: Union[str, Path, Any]) -> PdfInspection:
         page.extract_text(visitor_operand_before=state.on_operator, visitor_text=state.on_text)
         visible.append("".join(state.visible))
         hidden.extend(state.hidden)
-    metadata = " ".join(str(v) for v in (reader.metadata or {}).values() if v)
-    return PdfInspection(visible_text="\n".join(visible), hidden_spans=hidden, metadata_text=metadata)
+    return "\n".join(visible), hidden, len(reader.pages)
 
 
-def evaluate_pdf(source: Union[str, Path, Any], stage: str = "entrada") -> PdfVerdict:
-    """Decide se um PDF deve ser sinalizado, olhando texto visivel, oculto e metadados."""
+def inspect_pdf(source: Union[str, Path, Any], motor: Optional[str] = None) -> PdfInspection:
+    """Le um PDF e separa o texto visivel do texto oculto.
+
+    `motor` escolhe "renderizacao" (pypdfium2 e numpy) ou "conteudo" (so
+    pypdf); sem escolha, usa a renderizacao quando estiver instalada.
+    """
+    from polar_sentinel.reference.pdf_percepcao import disponivel
+
+    dados = _ler_bytes(source)
+    if motor is None:
+        motor = "renderizacao" if disponivel() else "conteudo"
+    leitor = _pela_renderizacao if motor == "renderizacao" else _pelo_conteudo
+    visible, hidden, paginas = leitor(dados)
+    achados = inspecionar_estrutura(dados)
+    metadata = " ".join(a.texto for a in achados if a.tipo == "metadado")
+    return PdfInspection(visible_text=visible, hidden_spans=hidden, metadata_text=metadata,
+                         achados=achados, motor=motor, paginas=paginas)
+
+
+def evaluate_pdf(source: Union[str, Path, Any], stage: str = "entrada",
+                 motor: Optional[str] = None) -> PdfVerdict:
+    """Decide se um PDF deve ser sinalizado, olhando texto visivel, oculto e o resto do arquivo."""
     from polar_sentinel.harness.orchestration import create_judicial_orchestrator
 
-    inspection = inspect_pdf(source)
+    inspection = inspect_pdf(source, motor=motor)
     reasons: List[str] = []
+    atencao: List[str] = []
 
     orchestrator = create_judicial_orchestrator(include_provenance=False)
     result = orchestrator.run(inspection.visible_text, context={"stage": stage, "source": "pdf"})
     if result.blocked or result.score > orchestrator.risk_threshold:
         reasons.append("comando_no_texto_visivel")
 
-    if inspection.metadata_text and detect_suspicious_patterns(inspection.metadata_text, stage)[0] > 0.4:
-        reasons.append("comando_em_metadado")
-
-    by_reason = {}
+    by_reason: Dict[str, List[str]] = {}
     for span in inspection.hidden_spans:
         by_reason.setdefault(span.reason, []).append(span.text)
     for reason, parts in by_reason.items():
         text = " ".join(p.strip() for p in parts)
         letters = sum(ch.isalpha() for ch in text)
-        has_order = bool(_ORDER_RE.search(fold(text))) or detect_suspicious_patterns(text, stage)[0] > 0.2
-        if reason == "fonte_minuscula" and letters >= _MIN_LETTERS:
+        if reason == "fonte_minuscula" and letters >= _MIN_LETTERS and parece_texto(text):
             reasons.append("texto_em_fonte_minuscula")
-        elif has_order:
+        elif tem_ordem(text, stage):
             reasons.append(f"ordem_em_texto_oculto ({reason})")
+        elif letters >= _MIN_LETTERS and reason != "baixo_contraste":
+            atencao.append(f"texto_oculto_sem_ordem ({reason})")
 
-    return PdfVerdict(flagged=bool(reasons), reasons=reasons, inspection=inspection)
+    for achado in inspection.achados:
+        if achado.tipo == "arquivo_embutido" and achado.detalhe.get("pdf"):
+            interno = evaluate_pdf(achado.detalhe.pop("inspecao"), stage, motor)
+            achado.detalhe["sinalizado"] = interno.flagged
+            if interno.flagged:
+                reasons.append("ordem_em_arquivo_embutido")
+            continue
+        sinal = _CANAIS_COM_TEXTO.get(achado.tipo)
+        if sinal and achado.texto and tem_ordem(achado.texto, stage):
+            if achado.tipo != "metadado" or dirigido_a_ia(achado.texto, stage):
+                reasons.append(sinal)
+        if achado.tipo in ("javascript", "arquivo_embutido", "camada_desligada"):
+            atencao.append(achado.tipo)
+        elif achado.tipo == "anotacao" and achado.detalhe.get("oculta"):
+            atencao.append("anotacao_oculta")
+
+    tudo = "\n".join([inspection.visible_text, *(s.text for s in inspection.hidden_spans),
+                      *(a.texto for a in inspection.achados)])
+    limpeza = sanitize_with_audit(tudo, source="pdf")
+    if limpeza.suspicious:
+        if limpeza.hidden_text and tem_ordem(limpeza.hidden_text, stage):
+            reasons.append("ordem_em_unicode_invisivel")
+        else:
+            atencao.append("unicode_invisivel")
+
+    return PdfVerdict(flagged=bool(reasons), reasons=list(dict.fromkeys(reasons)),
+                      inspection=inspection, atencao=list(dict.fromkeys(atencao)))

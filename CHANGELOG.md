@@ -2,6 +2,47 @@
 
 Formato baseado em Keep a Changelog. Versionamento semantico.
 
+## 0.5.0
+
+Documento completo: o que a pessoa ve contra o que a maquina le.
+
+### Adicionado
+
+* Inspecao pela pagina renderizada (`reference/pdf_percepcao.py`): a pagina e
+  desenhada com e sem o texto, e cada caractere extraido ganha medidas fisicas
+  (contraste WCAG contra o fundo realmente desenhado, tamanho, cor, opacidade,
+  modo, rotacao, posicao). Acha texto atras de imagem, recortado, transparente,
+  em modo invisivel e na cor de faixas que nao sao brancas, que a leitura do
+  conteudo nao via. O limite de leitura sobe quando a letra e pequena. Pede
+  `pypdfium2` e `numpy`; sem eles, vale a leitura antiga.
+* Conferencia da camada de OCR de paginas digitalizadas com o Tesseract,
+  quando instalado: linha da camada que a imagem nao confirma vira
+  `ocr_divergente`.
+* Estrutura do PDF (`reference/pdf_estrutura.py`): anotacoes, campos de
+  formulario, camadas que abrem desligadas, arquivos anexados (PDF anexado e
+  inspecionado), JavaScript, links, metadados XMP e revisoes incrementais.
+* Inspecao de `.docx` (`reference/docx_inspector.py`), so com a biblioteca
+  padrao: propriedade oculto no trecho e no estilo, letra na cor do
+  sombreamento, do realce ou da pagina, fonte minuscula, texto excluido com
+  controle de alteracoes, comentarios, texto alternativo, codigos de campo,
+  XML personalizado, macros e objetos embutidos.
+* Palavras partidas ("red ija", "pro vido") deixam de esconder a ordem no
+  texto oculto.
+* Certidao de inspecao tecnica (`python -m polar_sentinel.certidao arquivo`),
+  com o que a Nota Tecnica CNJ 2635739 pede: peca, pagina, natureza, medidas,
+  trecho, SHA-256 do trecho e do arquivo, acao, data e hora de Brasilia e
+  versao. Descreve fatos; nao atribui autoria nem intencao.
+* `benchmarks/documentos_reais.py`: falso positivo em pastas de documentos
+  reais, com intervalo de Wilson. `benchmarks/fronteira.py`: grade de
+  contraste e tamanho que mostra onde um comando escapa.
+
+### Mudado
+
+* `evaluate_pdf` devolve tambem `atencao` (texto oculto sem ordem,
+  JavaScript, anexos, camadas desligadas, Unicode invisivel) e aceita
+  `motor="renderizacao"` ou `motor="conteudo"`.
+* O extra `pdf` passa a instalar `pypdfium2`, `numpy` e `pillow`.
+
 ## 0.4.1
 
 Sem mudanca de codigo.

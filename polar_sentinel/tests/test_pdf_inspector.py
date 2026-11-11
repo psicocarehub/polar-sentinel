@@ -102,22 +102,31 @@ def test_texto_branco_sem_ordem_e_relatado_mas_nao_sinaliza():
 
 
 def test_camada_invisivel_de_ocr_e_texto_normal():
+    """Na leitura do conteudo, o modo 3 segue como texto; a renderizacao exige a imagem embaixo
+    (test_documento_completo.py)."""
     def ocr(c):
         t = c.beginText(50, 400)
         t.setTextRenderMode(3)
         t.setFont("Helvetica", 11)
         t.textLine("Certidão de intimação da parte autora, expedida em 10/03/2026.")
         c.drawText(t)
-    veredito = evaluate_pdf(_peticao(ocr))
+    veredito = evaluate_pdf(_peticao(ocr), motor="conteudo")
     assert not veredito.flagged, veredito.reasons
     assert "Certidão de intimação" in veredito.inspection.visible_text
 
 
+MOTORES = ["conteudo", "renderizacao"]
+
+
+@pytest.mark.parametrize("motor", MOTORES)
 @pytest.mark.parametrize("caso", BRASILEIROS, ids=lambda c: c.id)
 @pytest.mark.parametrize("esconde", [_branco, _minusculo, _cor_do_rodape],
                          ids=["branco_sobre_branco", "fonte_0_8_ponto", "cor_do_rodape"])
-def test_comando_real_escondido_e_sinalizado(caso, esconde):
-    veredito = evaluate_pdf(_peticao(esconde(caso.text)))
+def test_comando_real_escondido_e_sinalizado(caso, esconde, motor):
+    if motor == "renderizacao":
+        pytest.importorskip("pypdfium2", exc_type=ImportError)
+        pytest.importorskip("numpy", exc_type=ImportError)
+    veredito = evaluate_pdf(_peticao(esconde(caso.text)), motor=motor)
     assert veredito.flagged, f"{caso.id} escondido passou"
     assert veredito.inspection.hidden_text, "o trecho oculto tem de ser devolvido para registro"
 

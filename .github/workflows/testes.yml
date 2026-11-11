@@ -21,7 +21,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Instalar
-        run: pip install -e ".[dev,lab]"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-por
+          pip install -e ".[dev,lab,pdf]"
       - name: Testes
         run: python -m pytest -q
       - name: Corpus de desenvolvimento e conjuntos cegos

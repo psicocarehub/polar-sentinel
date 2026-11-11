@@ -32,6 +32,16 @@ detector:
 | Conjunto cego em português jurídico: ataques pegos (60) | 13,3% | **55,0%** (intervalo de 95%: 43 a 67) |
 | Conjunto cego em português jurídico: legítimos sinalizados (60) | 20,0% | **6,7%** (3 a 16) |
 
+Na versão 0.5.0, a inspeção de documento passou a comparar a página
+renderizada com o texto extraído e a ler PDF e .docx inteiros:
+
+| Medida (0.5.0) | Resultado |
+| --- | --- |
+| Conjunto cego de documentos, escrito sem ver o código: ataques pegos (40) | **34** (85%; intervalo de 95%: 71 a 93) |
+| O mesmo conjunto: legítimos difíceis sinalizados (27) | **1** (3,7%) |
+| Documentos públicos reais nunca vistos sinalizados por engano (437 arquivos, 2.401 páginas) | **2** (0,46%; intervalo: 0,13 a 1,65) |
+| Comandos reais escondidos abaixo do limite de leitura, em qualquer tamanho | **todos** |
+
 Três coisas para ler nessa tabela:
 
 * **O ataque real é de forma, e forma se detecta.** Em todos os casos
@@ -100,17 +110,39 @@ pip install -e ".[dev]"   # testes e lint
 
 ## Uso rápido
 
-### Inspeção de PDF
+### Inspeção de documento (PDF e .docx)
+
+```bash
+pip install "polar-sentinel[pdf]"
+python -m polar_sentinel.certidao peticao.pdf --processo 0000000-00.2026.8.26.0100 --peca "Petição inicial"
+```
+
+A certidão traz o que a Nota Técnica CNJ 2635739 pede: peça, página, natureza
+técnica, medidas (contraste, tamanho, cores, posição), trecho, SHA-256 do
+trecho e do arquivo, ação tomada, data e hora de Brasília e versão. Ela
+descreve fatos do arquivo; não atribui autoria nem intenção.
 
 ```python
 from polar_sentinel.reference.pdf_inspector import evaluate_pdf
+from polar_sentinel.reference.docx_inspector import evaluate_docx
 
 veredito = evaluate_pdf("peticao.pdf")
-print(veredito.flagged, veredito.reasons)
+print(veredito.flagged, veredito.reasons, veredito.atencao)
 for trecho in veredito.inspection.hidden_spans:        # o que o leitor humano não vê
-    print(trecho.page, trecho.reason, trecho.text)
+    print(trecho.page, trecho.reason, trecho.medidas["contraste"], trecho.text)
 texto_para_o_modelo = veredito.inspection.visible_text  # sem o trecho oculto
 ```
+
+A página é renderizada com e sem o texto. Cada caractere que a extração entrega
+à IA é medido contra o que de fato aparece na tela: contraste com o fundo
+desenhado atrás dele, tamanho, opacidade, modo, posição. Isso acha texto
+branco, minúsculo, na cor de qualquer faixa, atrás de imagem, recortado,
+transparente, em modo invisível ou fora da página, e libera papel timbrado e a
+camada de OCR de digitalizados (conferida com o Tesseract, quando instalado).
+Fora da página, o arquivo também é lido: anotações, campos de formulário,
+camadas desligadas, anexos, JavaScript, links e metadados. No .docx: texto
+oculto, na cor do sombreamento, minúsculo, excluído com controle de
+alterações, comentários, texto alternativo e códigos de campo.
 
 O trecho oculto é devolvido para ser registrado nos autos, não descartado.
 

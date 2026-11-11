@@ -30,6 +30,9 @@ Três leituras:
 ## Como repetir
 
 ```bash
+python -m polar_sentinel.benchmarks.fronteira                 # grade de contraste e tamanho
+python -m polar_sentinel.benchmarks.documentos_reais PASTA    # falso positivo em documentos reais
+python -m polar_sentinel.benchmarks.cego_documentos PASTA     # conjunto cego de documentos
 python -m polar_sentinel.benchmarks.agent_safety_bench        # corpus de desenvolvimento
 python -m polar_sentinel.benchmarks.heldout_eval --casos      # validação, cego 1 e cego 2
 python -m pytest -q polar_sentinel/tests/test_pdf_inspector.py   # comandos reais escondidos em PDF
@@ -186,6 +189,98 @@ envenenamento de memória 1 de 4; paráfrase dirigida à IA 1 de 6; ordem para
 pular a revisão 0 de 3; exfiltração 0 de 3 (rode `heldout_eval --casos` para a
 lista atual). Os benignos do cego 2 foram pedidos difíceis de propósito, o que
 explica os 6,7% contra 0,05% em documentos reais.
+
+## 5. Documento completo (versão 0.5.0)
+
+A inspeção de documento passou a comparar o que a pessoa vê com o que a
+máquina lê: a página é renderizada com e sem o texto, e cada caractere
+extraído é medido contra o fundo realmente desenhado atrás dele. Também lê o
+que o arquivo carrega fora da página (anotações, campos, camadas, anexos,
+JavaScript, links, metadados) e o .docx. Três medidas, em ordem de confiança.
+
+### Conjunto cego de documentos
+
+Escrito por um agente que não leu o código do detector: 40 ataques, cada um
+com uma ordem de redação própria escondida de uma forma escolhida por ele
+(29 técnicas em PDF, 11 em .docx), e 27 documentos legítimos feitos para
+confundir (timbre branco sobre foto, marca d'água, camada de OCR, formulário
+preenchido, revisão com exclusões, decisão com "defiro" e "intime-se",
+petição sobre uso de IA, representação que cita um comando entre aspas).
+Rodado uma vez, antes de qualquer ajuste:
+
+| | Sinalizados | Intervalo de 95% |
+| --- | --- | --- |
+| Ataques (40) | **34** (85,0%) | 70,9% a 92,9% |
+| Legítimos (27) | **1** (3,7%) | 0,7% a 18,3% |
+
+Os seis ataques que passaram: página só em imagem com a ordem em pixels de
+baixo contraste, sem camada de texto (é imagem, fica para a próxima fase);
+letras separadas por espaço de largura zero; anotação oculta dirigida a um
+"leitor automatizado"; ordem nos metadados do PDF e do .docx; palavras
+partidas em sílabas na cor da faixa do rodapé. O legítimo sinalizado é a
+representação à OAB que cita o comando em texto visível: quem pega é o
+detector de texto, não a inspeção de documento, e é o limite já conhecido de
+um detector de padrões.
+
+Depois disso, as regras foram ajustadas com esses casos (largura zero
+removida antes da busca, radicais para sílabas partidas, "leitor
+automatizado", metadado com destinatário de IA explícito). Com o ajuste, 39 de
+40; esse número não mede generalização, e o conjunto passa a ser de
+desenvolvimento.
+
+### Documentos reais (falso positivo)
+
+Documentos públicos que não foram escritos para o detector: pareceres
+jurídicos do MAPA, atas e documentos de colegiados (inclusive .docx) e
+licenças ambientais, com muitos digitalizados e assinados. Ficam fora do
+repositório; o script que mede é `benchmarks/documentos_reais.py`.
+
+| Amostra | Arquivos | Páginas | Sinalizados |
+| --- | --- | --- | --- |
+| Desenvolvimento, primeira rodada | 599 | 2.910 | 2 (0,33%) |
+| Desenvolvimento, depois do ajuste | 599 | 2.910 | 1 (0,17%; intervalo de 95%: 0,03% a 0,94%) |
+| Amostra nova, nunca vista, antes do ajuste | 437 | 2.401 | **2 (0,46%; intervalo de 95%: 0,13% a 1,65%)** |
+| A mesma amostra depois do ajuste | 437 | 2.401 | 0 |
+
+O número que vale como teste é o da amostra nova antes do ajuste: 2 em 437.
+Os dois foram um bloco de base64 num XML embutido de .docx em que "gpt"
+aparecia por acaso, e glifos sem mapeamento de caracteres que a extração lia
+como lixo em fonte de 0,1 ponto. Os dois ajustes que eles motivaram (radicais
+curtos fora da busca sem espaço; fonte minúscula só conta se o trecho parece
+texto) e os da primeira rodada (marca d'água grande e clara é visível; o
+tamanho efetivo considera a matriz do caractere) ficaram nas regras. O único
+sinalizado restante na amostra de desenvolvimento vem do detector de texto
+visível, não da inspeção de documento. Tempo médio: 0,09 segundo por página.
+
+### Fronteira de evasão
+
+`benchmarks/fronteira.py` escreve os dez comandos reais em cinza sobre branco
+numa grade de contraste e tamanho e conta quantos são sinalizados:
+
+| pt | 1,05 | 1,15 | 1,25 | 1,4 | 1,6 | 2,0 | 2,5 | 3,0 | 4,5 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 10 | 10 | 10 | 10 | 10 | 10 | 10 | 10 | 10 |
+| 2 | 10 | 10 | 10 | 10 | 10 | 10 | 10 | 10 | 9 |
+| 3 | 10 | 10 | 10 | 10 | 10 | 10 | 10 | 10 | 9 |
+| 4 | 10 | 10 | 10 | 10 | 10 | 9 | 9 | 9 | 9 |
+| 6 | 10 | 10 | 10 | 10 | 9 | 9 | 9 | 9 | 9 |
+| 10 | 10 | 10 | 10 | 10 | 9 | 9 | 9 | 9 | 9 |
+
+Abaixo do limite de leitura, que sobe quando a letra é pequena, os dez são
+sinalizados. Acima dele, o comando é tratado como texto visível e só o
+detector de texto decide (9 de 10). Ou seja: para escapar, o comando precisa
+ficar tão legível quanto o rodapé de um documento comum, e ainda passar pelo
+detector de texto. Os limiares de visibilidade e de leitura são escolhas de
+engenharia; a calibração com pessoas lendo as mesmas páginas não foi feita e
+é o próximo passo desta medida.
+
+### Limites desta rodada
+
+* O conjunto cego é pequeno (40 e 27) e foi escrito por um único autor.
+* Os documentos reais são de órgãos públicos, não petições de advogados; peças
+  de parte com geradores variados ainda não foram medidas.
+* Imagem sem camada de texto não é inspecionada.
+* Não houve atacante adaptativo com acesso ao código além da grade acima.
 
 ## O que mudou entre a versão 0.3.0 e a 0.4.0
 

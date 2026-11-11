@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "polar-sentinel"
-version = "0.4.1"
+version = "0.5.0"
 description = "Camada aberta de defesa em profundidade para uso seguro e soberano de IA no Judiciario brasileiro."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -32,8 +32,10 @@ dependencies = []
 ml = ["transformers>=4.40", "torch>=2.0"]
 # Laboratorio visual e geracao de PDFs de teste
 lab = ["streamlit>=1.33", "pypdf>=4.0", "reportlab>=4.0"]
-# Inspecao de PDF: texto oculto por cor, tamanho ou posicao
-pdf = ["pypdf>=4.0"]
+# Inspecao de PDF: pagina renderizada contra texto extraido, estrutura do arquivo
+# e certidao. Sem pypdfium2 e numpy, a inspecao cai para a leitura do conteudo.
+# A conferencia de paginas digitalizadas usa o Tesseract, se estiver instalado.
+pdf = ["pypdf>=4.0", "pypdfium2>=4.30", "numpy>=1.24", "pillow>=10.1"]
 # Medida em dados publicos (leitura dos parquet baixados)
 eval = ["pyarrow>=14.0"]
 # Cliente HTTP para adapters de API externa
