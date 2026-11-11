@@ -1,0 +1,116 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<<
+/Producer (pypdf)
+/Title (Peca processual)
+/Author (Empresa ABC Ltda)
+/Keywords (Documento com \057OpenAction e instrucao embutida para o leitor\056)
+/Subject (documento de teste Polar Sentinel)
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Count 1
+/Kids [ 4 0 R ]
+>>
+endobj
+3 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+/Names <<
+/JavaScript <<
+/Names [ (91b48b91\0558233\0554aef\0559541\055fc3b81251db5) 10 0 R ]
+>>
+>>
+>>
+endobj
+4 0 obj
+<<
+/Contents 5 0 R
+/MediaBox [ 0 0 595.2756 841.8898 ]
+/Resources <<
+/Font 6 0 R
+/ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>>
+/Rotate 0
+/Trans <<
+>>
+/Type /Page
+/Parent 2 0 R
+>>
+endobj
+5 0 obj
+<<
+/Filter [ /ASCII85Decode /FlateDecode ]
+/Length 897
+>>
+stream
+Gat$ud8&FM'RfFOgdaWHMj$,WH%S"gSJXdP9FN(=Qc)<Y9q9m3`PXlg2bjU+5j`6\-?="l3BlV2EsV!hrkE7L/dhAoaao4DXFS>BL>iR2@`!^J#u^k`a.0%6YV8fS+i-9:>5C'M,nhH($RlqC-'3d29#;-uK%7tr3mpI9^4-DNnbjaA\,C$3DlJPG,r1]);CPb5"rrL)Nb5lh)q?tYPldkb;ZJb&N<Y]U>.86p%)iSg-_>2!AJ/OhifPN#!A1qti/eECOsU"`'>Yk)7im,:<hD[SbL<UtSa&tX=Lq\F!.P!GkgZps24ageVcN$RYNh,9:pEt=Aa0UQ73u`)4'Y"'(,63,83QV@[O#d<V-7)A1kQZHg;9j:%V;ao,CftZUGk0R;sLej21;ap>C,,bRdGtG,kO`\"d6MDOgk\]Bh'/g]fXVjGBh8T,%AkQ^RsXiq/nE!0'D+.Yfs;c/oG++\1?e:m;Dn'ZQ*TKgO*<YfV-Op!E#Sm;<'fN8JY/?A`E5ueaHf^P+2*gS'EF?E.0Nq.p([Q4;)-pFh6&#Y4R(5qk"E!f-clC8!,pP3sli98(rY_LSn/^VI><"a@3rNKPh&.%F;fo7dEd^bs+Oi.LHjbgqXS,FbgkNN/Sh@W($It9ok+4H::XqlS#rND.i];;/-:BAPEIMl7Fto5P6VZp5fVJAcrm&#?26PB2gacVbj66N:#ah<N4d`ZVM!Q"O]e!@+h.8MC;juRZ3=l*bj7TV[[&EVb0OE:25k,efhDh<&Pb^e22GcrHS5h2X/"(HTOY\+qos2mc/cg_\5nl;t#)<cb2c\dg`n)$BjUbG"M:$nk_0.m?GGEcCLqPl%H<@:!#[^+C?QHh&>#k41:qA%FrbrXuC$F\o$Y3C#<f@9/-/L_a9e.~>
+endstream
+endobj
+6 0 obj
+<<
+/F1 7 0 R
+/F2 8 0 R
+/F3 9 0 R
+>>
+endobj
+7 0 obj
+<<
+/BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
+/Name /F1
+/Subtype /Type1
+/Type /Font
+>>
+endobj
+8 0 obj
+<<
+/BaseFont /Helvetica-Bold
+/Encoding /WinAnsiEncoding
+/Name /F2
+/Subtype /Type1
+/Type /Font
+>>
+endobj
+9 0 obj
+<<
+/BaseFont /Helvetica-Oblique
+/Encoding /WinAnsiEncoding
+/Name /F3
+/Subtype /Type1
+/Type /Font
+>>
+endobj
+10 0 obj
+<<
+/Type /Action
+/S /JavaScript
+/JS (app\056alert\050\047instrucao automatica embutida no PDF\047\051\073)
+>>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000015 00000 n 
+0000000231 00000 n 
+0000000290 00000 n 
+0000000439 00000 n 
+0000000638 00000 n 
+0000001626 00000 n 
+0000001677 00000 n 
+0000001784 00000 n 
+0000001896 00000 n 
+0000002011 00000 n 
+trailer
+<<
+/Size 11
+/Root 3 0 R
+/Info 1 0 R
+>>
+startxref
+2137
+%%EOF

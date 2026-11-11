@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "polar-sentinel"
+version = "0.4.0"
+description = "Camada aberta de defesa em profundidade para uso seguro e soberano de IA no Judiciario brasileiro."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Marcio Andre de Souza Estevam" }, { name = "Polar" }]
+keywords = [
+    "prompt-injection",
+    "llm-security",
+    "agentic-safety",
+    "judiciario",
+    "cnj-615",
+    "soberania",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Legal Industry",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = []
+
+[project.optional-dependencies]
+# Detector adversarial com modelo de privacidade e NER
+ml = ["transformers>=4.40", "torch>=2.0"]
+# Laboratorio visual e geracao de PDFs de teste
+lab = ["streamlit>=1.33", "pypdf>=4.0", "reportlab>=4.0"]
+# Inspecao de PDF: texto oculto por cor, tamanho ou posicao
+pdf = ["pypdf>=4.0"]
+# Medida em dados publicos (leitura dos parquet baixados)
+eval = ["pyarrow>=14.0"]
+# Cliente HTTP para adapters de API externa
+http = ["httpx>=0.27"]
+# Desenvolvimento
+dev = ["pytest>=8.2", "pytest-cov>=4.0", "ruff>=0.4"]
+
+[project.urls]
+Homepage = "https://github.com/psicocarehub/polar-sentinel"
+Documentation = "https://github.com/psicocarehub/polar-sentinel/tree/main/docs"
+
+[tool.setuptools]
+packages = [
+    "polar_sentinel",
+    "polar_sentinel.reference",
+    "polar_sentinel.harness",
+    "polar_sentinel.benchmarks",
+    "polar_sentinel.attacks",
+    "polar_sentinel.demo",
+    "polar_sentinel.publishing",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["polar_sentinel/harness", "polar_sentinel/tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

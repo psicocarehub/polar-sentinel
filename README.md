@@ -1,0 +1,237 @@
+# Polar Sentinel
+
+Camada aberta de defesa contra injeção de comandos (prompt injection) em
+documentos lidos por sistemas de IA do Judiciário brasileiro.
+
+Fica entre o documento e o modelo: inspeciona o PDF em busca de texto que o
+leitor humano não vê, redige dados pessoais, remove canais ocultos, procura
+ordens dirigidas à IA que vai ler a peça e exige aprovação humana de uso único
+antes de qualquer ação irreversível. O núcleo é Python puro, sem dependências, e
+as etapas de defesa não fazem chamada de rede. Licença Apache 2.0.
+
+## O que ele pega, medido
+
+No corpus em que as regras foram escritas, o benchmark dá 100%. Esse número não
+mede nada. O que vale é o resultado em dados que não foram escritos para o
+detector:
+
+| Medida | Versão 0.3.0 | Versão 0.4.0 |
+| --- | --- | --- |
+| Decisões, ementas e modelos de petição reais sinalizados por engano (4.007 documentos) | 20,3% | **0,05%** |
+| Comandos reais publicados por tribunais brasileiros, pegos no texto (10) | 0 | **9** (eram 2 antes do ajuste com eles) |
+| Os mesmos comandos escondidos em PDF: fonte branca, fonte de 0,8 ponto, cor do rodapé (30 arquivos) | sem inspeção | **30** |
+| E-mails de ataque do LLMail-Inject (951) | 23,7% | **56,8%** |
+| Conjunto cego em português jurídico: ataques pegos (60) | 13,3% | **55,0%** (intervalo de 95%: 43 a 67) |
+| Conjunto cego em português jurídico: legítimos sinalizados (60) | 20,0% | **6,7%** (3 a 16) |
+
+Três coisas para ler nessa tabela:
+
+* **O ataque real é de forma, e forma se detecta.** Em todos os casos
+  brasileiros conhecidos o comando estava invisível. A inspeção de PDF olha cor,
+  tamanho e posição do texto, e libera papel timbrado e camada de OCR.
+* **Em documento real quase não incomoda.** Dois sinalizados em 4.007. A versão
+  anterior barrava 43% dos acórdãos inteiros do STJ.
+* **Ordem em linguagem comum passa em cerca de metade das vezes.** No conjunto
+  cego, ofuscação é pega em 11 de 12 casos; paráfrase dirigida à IA em 1 de 6,
+  exfiltração em 0 de 3, ordem para pular a revisão em 0 de 3.
+
+Ou seja: é uma triagem barata, determinística e explicável. **Não é garantia de
+que um documento liberado está limpo.** A proteção que não depende de o detector
+acertar é o portão de aprovação humana.
+
+O 9 de 10 nos comandos reais não mede generalização: as regras foram ajustadas
+com esses textos. O protocolo, os números de cada rodada e os limites da medida
+estão em [docs/AVALIACAO.md](docs/AVALIACAO.md). O texto completo está em
+[paper/polar-sentinel.md](paper/polar-sentinel.md).
+
+## Por que isso importa
+
+Em 2026 o Brasil teve os primeiros casos confirmados de injeção de comandos em
+peças processuais:
+
+* TRT-8, 3ª Vara do Trabalho de Parauapebas: ordem dirigida à IA do juízo, em
+  fonte branca sobre fundo branco, em petição inicial; multa de cerca de R$ 84
+  mil por ato atentatório à dignidade da justiça.
+* STJ: em 20 de maio de 2026 o tribunal informou ter encontrado tentativas
+  semelhantes em petições e a abertura de inquérito policial.
+* CNJ: a Manifestação Técnica CNIAJ nº 1/2026 tratou do tema e deu origem a
+  nota técnica dirigida aos tribunais.
+* Depois vieram casos no TJSP, no TJMG, no TRT-5, no TJPB, no STF e em três
+  turmas do STJ. Os comandos que os tribunais publicaram, com a fonte de cada
+  um, estão em `polar_sentinel/attacks/reais.py`.
+
+O panorama, com incidentes e referências, está em
+[docs/MODELO_DE_AMEACAS.md](docs/MODELO_DE_AMEACAS.md).
+
+## As etapas
+
+| Etapa | O que faz | Estado neste repositório |
+| --- | --- | --- |
+| Inspeção de PDF | Separa o texto visível do texto na cor do fundo, em fonte minúscula ou fora da página | Implementado (pede `pypdf`) |
+| Filtro de dados pessoais | Redige CPF, CNPJ, RG, e-mail, telefone, CEP e conta bancária | Implementado, por expressões regulares |
+| Leitura segura do documento | Remove caracteres invisíveis, controles bidirecionais, tag characters, seletores de variação, comentários HTML e sequências ANSI, com trilha do que saiu | Implementado |
+| Detector de comandos | Procura ordens dirigidas à IA no texto limpo e no conteúdo que estava oculto | Implementado |
+| Conferência de fontes | Confere a origem declarada de um trecho | Só referência: não consulta base de jurisprudência |
+| Aprovação humana | Portão de uso único, com validade e conferência de hash | Implementado |
+| Registro e auditoria | Trilha por etapa no resultado do orquestrador | Padrão de referência: não há armazenamento |
+
+O que este repositório não traz: manuseio de certificado ICP-Brasil, integrações
+com PJe e eproc, classificador treinado ou camada semântica com modelo.
+
+## Instalação
+
+```bash
+pip install -e .
+# extras opcionais
+pip install -e ".[pdf]"   # inspeção de PDF
+pip install -e ".[lab]"   # laboratório visual e geração de PDFs
+pip install -e ".[eval]"  # medida em conjuntos públicos
+pip install -e ".[http]"  # adaptadores de API externa
+pip install -e ".[dev]"   # testes e lint
+```
+
+## Uso rápido
+
+### Inspeção de PDF
+
+```python
+from polar_sentinel.reference.pdf_inspector import evaluate_pdf
+
+veredito = evaluate_pdf("peticao.pdf")
+print(veredito.flagged, veredito.reasons)
+for trecho in veredito.inspection.hidden_spans:        # o que o leitor humano não vê
+    print(trecho.page, trecho.reason, trecho.text)
+texto_para_o_modelo = veredito.inspection.visible_text  # sem o trecho oculto
+```
+
+O trecho oculto é devolvido para ser registrado nos autos, não descartado.
+
+### Leitura segura
+
+```python
+from polar_sentinel import sanitize_with_audit
+
+resultado = sanitize_with_audit(texto_do_pdf, source="peticao_upload")
+print(resultado.text)                                   # texto limpo
+print([(e.kind, e.count) for e in resultado.entries])   # trilha do que saiu
+print(resultado.suspicious)                             # houve ocultação?
+```
+
+### Detector
+
+```python
+from polar_sentinel import detect_suspicious_patterns
+
+score, razoes = detect_suspicious_patterns(texto)                    # documento que chega
+score, razoes = detect_suspicious_patterns(resumo, stage="saida")    # texto que a ferramenta produziu
+if score > 0.4:
+    print("Suspeito:", razoes)
+```
+
+Na entrada, "julgo procedente" é texto normal de sentença. Na saída de uma
+ferramenta de apoio, é o que a governança deve barrar.
+
+### Portão de aprovação humana
+
+```python
+from polar_sentinel import (
+    create_pending_approval, approve_pending, consume_approval, payload_hash,
+)
+
+payload = {"tribunal": "TRT-8", "pdf_sha256": "..."}
+digest = payload_hash("tribunal.protocolar", payload)
+
+pend = create_pending_approval(
+    action="tribunal.protocolar", payload=payload, user_id="advogada_1"
+)
+assert consume_approval(pend.id, "tribunal.protocolar", digest) is False   # sem aprovação, falha
+approve_pending(pend.id, user_id="advogada_1")
+assert consume_approval(pend.id, "tribunal.protocolar", digest) is True    # uso único
+assert consume_approval(pend.id, "tribunal.protocolar", digest) is False   # repetição falha
+```
+
+### Pipeline completo com qualquer API
+
+```python
+from polar_sentinel import SentinelPipeline
+from polar_sentinel.harness.adapters import OpenAICompatibleAdapter
+
+adapter = OpenAICompatibleAdapter(base_url="https://sua-api/v1", model="seu-modelo")
+pipeline = SentinelPipeline(adapter=adapter)
+
+resultado = pipeline.analyze_and_protect(
+    document_text=texto, action="tribunal.protocolar", user_id="advogada_1"
+)
+print(resultado["status"], resultado["risk_score"], resultado["hitl_required"])
+```
+
+## Medir
+
+```bash
+python -m pytest -q                                           # suíte de testes
+python -m polar_sentinel.benchmarks.agent_safety_bench        # corpus de desenvolvimento
+python -m polar_sentinel.benchmarks.heldout_eval --casos      # validação e conjuntos cegos
+
+# conjuntos públicos (ataques escritos por pessoas e textos jurídicos reais)
+pip install -e ".[eval]"
+python -m polar_sentinel.benchmarks.baixar_externos ~/sentinel_externos
+python -m polar_sentinel.benchmarks.external_eval ~/sentinel_externos
+```
+
+Os conjuntos públicos não são redistribuídos aqui: o script os baixa do Hugging
+Face. Cada um é dividido em duas metades pelo hash do texto; a de
+desenvolvimento pode ser lida para corrigir regras, a de teste só recebe medida.
+
+O conjunto cego 2 só continua valendo como medida enquanto ninguém ajustar
+regras olhando para ele. Quem alterar o detector deve trazer um conjunto novo.
+
+## Laboratório visual e PDFs de teste
+
+```bash
+pip install -e ".[lab]"
+streamlit run polar_sentinel/demo/sentinel_test_page.py       # envia PDF ou texto e mostra cada etapa
+python -m polar_sentinel.attacks.generate_test_pdfs           # gera PDFs que embutem cada vetor do corpus
+```
+
+Todos os exemplos usam dados fictícios. O catálogo dos vetores está em
+[docs/CATALOGO_DE_ATAQUES.md](docs/CATALOGO_DE_ATAQUES.md), e a explicação em
+linguagem simples em
+[docs/TIPOS_DE_ATAQUE_EXPLICADOS.md](docs/TIPOS_DE_ATAQUE_EXPLICADOS.md).
+
+## Estrutura
+
+```
+polar_sentinel/
+  reference/      etapas de defesa
+  harness/        orquestrador, pipeline, adaptadores e testes de cenário
+  attacks/        corpus de desenvolvimento, validação, conjuntos cegos, comandos reais e gerador de PDFs
+  benchmarks/     medida no corpus, nos conjuntos cegos e em dados públicos
+  demo/           laboratório visual em Streamlit
+  tests/          testes unitários e orientados pelos conjuntos
+docs/             documentação técnica e avaliação
+paper/            texto completo
+```
+
+A documentação está indexada em [docs/README.md](docs/README.md); o mapeamento
+para a Resolução CNJ nº 615/2025 está em
+[docs/CONFORMIDADE_CNJ_615.md](docs/CONFORMIDADE_CNJ_615.md).
+
+## Como contribuir
+
+* Tribunais e escritórios: abram issues com casos de ataque, sempre anonimizados.
+  Um comando real novo, com a fonte, é a contribuição que mais vale: é o único
+  teste de generalização em caso real.
+* Pesquisadores: tragam um conjunto cego novo ou uma camada de sentido, e meçam.
+* Vulnerabilidades: use o aviso privado descrito em [SECURITY.md](SECURITY.md).
+
+Este repositório reúne apenas vetores já descritos em literatura pública.
+
+## Como citar
+
+Estevam, M. A. S. (2026). *Polar Sentinel: o que um filtro determinístico de
+injeção de comandos pega, e o que deixa passar, em documentos jurídicos
+brasileiros*. Veja [CITATION.cff](CITATION.cff).
+
+## Licença
+
+Apache 2.0. Veja [LICENSE](LICENSE).

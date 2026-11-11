@@ -1,0 +1,29 @@
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Ambientes
+.venv/
+venv/
+env/
+
+# Editores
+.idea/
+.vscode/
+
+# Artefatos locais de teste que nao devem ir ao repositorio
+polar_sentinel/attacks/out/
+*.local.pdf

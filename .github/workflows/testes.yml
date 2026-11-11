@@ -1,0 +1,29 @@
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Instalar
+        run: pip install -e ".[dev,lab]"
+      - name: Testes
+        run: python -m pytest -q
+      - name: Corpus de desenvolvimento e conjuntos cegos
+        run: |
+          python -m polar_sentinel.benchmarks.agent_safety_bench
+          python -m polar_sentinel.benchmarks.heldout_eval
