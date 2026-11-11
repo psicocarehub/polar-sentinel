@@ -2,6 +2,15 @@
 
 Formato baseado em Keep a Changelog. Versionamento semantico.
 
+## 0.4.1
+
+Sem mudanca de codigo.
+
+* DOI do Zenodo no README, em `CITATION.cff` e no texto completo.
+* Metadados do registro no Zenodo em `.zenodo.json`.
+* Testes automaticos em Python 3.10 e 3.12.
+* Ajuste de redacao na nota final do texto completo.
+
 ## 0.4.0
 
 Medicao fora do corpus proprio, em dados reais, e correcao do que ela mostrou.
