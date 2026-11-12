@@ -137,7 +137,9 @@ _WEAK = [
     r"\b(?:" + _OVERRIDE_IMPERATIVE + r")\s+(?:all|previous|prior|earlier|above|the|todas?|as|"
     r"os|qualquer|tudo|everything)\b",
     r"(?:output|responda|retorne|escreva|answer|respond)\s+(?:only|apenas|somente)",
-    r"\b(?:jailbreak|burlar)\b",
+    # "burlar a lei" e comum em peca; so conta burlar um controle.
+    r"\bjailbreak\b|\bburlar\s+(?:o|os|a|as|esse|este|essa|esta|seus?|suas?)\s+(?:filtros?|"
+    r"seguranca|controles?|protec\w+|guardrails?|restric\w+|bloqueios?|regras do sistema)\b",
     r"(?:new|nova)\s+(?:instruction|instrucao|ordem|regra)s?\s*:",
     r"system\s*:|^\s*sistema\s*:",
     r"sem\s+(?:a\s+)?(?:revisao|aprovacao|conferencia|supervisao)\b",
@@ -202,7 +204,8 @@ _ADDRESSED_TO_AI = [
     r"\b(?:" + _LABEL + r")(?:\s+\w+){0,2}?[\s,:(]+(?:(?:a|ao|aos|as|para|para o|para a|"
     r"para os|para as)\s+)?(?:" + _AI_TERM + r")",
     # rotulo com forma curta e dois-pontos logo depois: "instrucao ao agente:"
-    r"\b(?:" + _LABEL + r")(?:\s+\w+){0,3}?\s+(?:ao|aos|para o|para os|para a|destinad\w+ aos?)"
+    # "em atencao ao sistema socioeducativo" e locucao de peca, nao rotulo.
+    r"(?<!em\s)(?<!em\s\s)(?<!com\s)(?<!com\s\s)\b(?:" + _LABEL + r")(?:\s+\w+){0,3}?\s+(?:ao|aos|para o|para os|para a|destinad\w+ aos?)"
     r"\s+(?:" + _AI_SHORT + r")\b[^.\n]{0,50}[:,]",
     # destinatario no inicio da frase: "ao sistema automatizado:", "para o agente de IA:"
     r"(?:^|[.!?]\s+)\(?(?:ao|aos|para o|para a|para os|a l'attention d[ue]|to the)\s+(?:"
@@ -285,7 +288,7 @@ _ROLE_LINE = re.compile(
 _ROLE_MARKERS = [
     r"<\s*/?\s*(?:system|sistema|instructions?|instrucoes|prompt|assistant|developer)\s*>",
     r"\"role\"\s*:\s*\"(?:system|assistant|developer)\"",
-    r"\[/?(?:inst|system|sistema|s)\]",
+    r"\[/?(?:inst|system|sistema)\]|\[/s\]",  # "[s]egundo" e citacao alterada
     r"<\|.*?\|>",
     r"```\s*(?:fim|end|system|sistema|prompt)",
     r"(?:fim|end)[_ ]d[oe][_ ](?:resumo|prompt|contexto|documento)\b.{0,40}"
@@ -415,7 +418,9 @@ _PERSONA = [
 ]
 
 # Marcadores de estrutura ativa de PDF, que nao deveriam chegar como texto.
-_ACTIVE_PDF = [r"/openaction", r"/javascript", r"/js\b", r"/launch", r"/aa\b"]
+# Nome de PDF solto, nao pedaco de endereco ("thomsonreuters.com/launchapp") nem
+# de sigla ("trf/4a" vira "trf/aa" no leetspeak).
+_ACTIVE_PDF = [r"(?<![\w.])/(?:openaction|javascript|js|launch|aa)\b"]
 
 # Linguagem com aparencia de decisao judicial.
 _JUDICIAL_DECISIVE = [
@@ -520,6 +525,28 @@ def _first(patterns: List[str], view: str, flags: int = 0) -> str:
     return ""
 
 
+def _ordem_de_dispositivo(view: str) -> bool:
+    """Imperativo de julgamento no inicio de frase, e nao numa linha quebrada.
+
+    Em PDF a linha quebra no meio da frase: "pretende que se\nreconheca a
+    inadmissibilidade" nao e ordem. Linha anterior terminada em letra ou virgula
+    e continuacao de frase.
+    """
+    for pattern in _JUDICIAL_ORDER:
+        for m in re.finditer(pattern, view, re.MULTILINE):
+            antes = view[:m.start()]
+            comeco_de_linha = m.start() > 0 and view[m.start() - 1] == "\n"
+            if comeco_de_linha and re.search(r"[a-z0-9,]$", antes.rstrip()):
+                continue
+            # Item do rol de pedidos ("b. conceda o pedido de liminar"): a peca
+            # pede ao juiz, nao manda na IA.
+            if re.search(r"(?:^|\n)\s*(?:\d{1,2}|[a-z]|[ivxl]{1,5})\s*[.)\-]\s*$",
+                         antes + m.group()[:len(m.group()) - len(m.group().lstrip(".!?: \n"))]):
+                continue
+            return True
+    return False
+
+
 def _strong_signals(view: str) -> List[Tuple[float, str]]:
     """Sinais fortes encontrados em uma vista do texto."""
     found: List[Tuple[float, str]] = []
@@ -563,7 +590,7 @@ def _strong_signals(view: str) -> List[Tuple[float, str]]:
         found.append((0.45, "troca_de_papel_ou_de_tarefa") if not any(
             r == "troca_de_papel_ou_de_tarefa" for _, r in found) else (0.0, "troca_de_papel_ou_de_tarefa"))
 
-    if _first(_JUDICIAL_ORDER, view, re.MULTILINE):
+    if _ordem_de_dispositivo(view):
         found.append((0.45, "ordem_de_dispositivo_dirigida_ao_leitor"))
 
     return found

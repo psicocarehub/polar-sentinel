@@ -37,10 +37,32 @@ Imagem, video, audio e autenticidade.
   C2PA (presenca, validade, assinante, declaracao de geracao por IA). Tres
   conclusoes: integridade confirmada, alteracao detectada, inconclusivo.
 * A certidao aceita imagem, video e audio, com instantes e duracoes.
+* Atacante adaptativo (`benchmarks/atacante_adaptativo.py`): conhece o codigo,
+  combina dez formas de esconder texto no PDF, nove transformacoes e
+  parafrases, confere com o Poppler que o ataque e extraivel e imperceptivel e
+  aprende com o que escapou. As regras abaixo vieram das rodadas dele.
+* PDF: a busca de ordem no texto oculto desfaz leetspeak e reune letras
+  espacadas; texto invisivel de fato que forma frase (seis palavras e duas de
+  ligacao) sinaliza mesmo sem ordem; texto oculto com letras soltas ou ligadas
+  por hifen sinaliza, inclusive em baixo contraste; texto substituto
+  (`/ActualText`) diferente dos glifos desenhados gera atencao e sinaliza com
+  ordem ou frase.
+* Levantamento do que a Justica brasileira le com IA, por formato
+  (`docs/pesquisa/IA-NA-JUSTICA-POR-FORMATO.md`), resumido no modelo de ameacas.
 * `python -m polar_sentinel.modelos` baixa o Whisper e o Vosk pequeno de
   portugues. Quando falta Tesseract, faster-whisper ou o modelo do Vosk, a
   leitura registra o que ficou de fora e a certidao mostra ("Leitura feita
   sem: ...").
+
+### Corrigido
+
+* A regra das seis palavras, feita para texto lido de imagem embutida, valia
+  para texto de PDF na cor do fundo e nao valia para a imagem embutida.
+* O faster-whisper 1.2 deixou de decodificar audio com o PyAV 19; o sinal
+  agora chega ja decodificado.
+* O extra `midia` pedia `vosk>=0.3.45`, versao que nao existe.
+* A certidao dizia "ordem em conteudo que o leitor nao ve" tambem quando a
+  ordem estava no texto visivel ou na fala audivel.
 
 ## 0.5.0
 

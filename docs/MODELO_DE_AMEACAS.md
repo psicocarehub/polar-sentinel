@@ -25,6 +25,29 @@ E preciso separar dois problemas que costumam ser confundidos:
 O Polar Sentinel atua sobre o segundo problema, a injecao de comandos, e ajuda
 no primeiro ao vincular toda citacao a uma fonte verificavel.
 
+## 1.1 O que a Justiça brasileira lê com IA, por formato (novembro de 2026)
+
+Um ataque só é risco real quando existe uma IA do lado de lá que lê aquele
+formato. Levantamento feito em 12/11/2026 em sites de tribunais, do CNJ, do MP
+e na imprensa jurídica:
+
+| Formato | Exposição | Por quê |
+| --- | --- | --- |
+| Texto e PDF de peças | **Real hoje** | Logos (STJ), MARIA (STF), Galileu (Justiça do Trabalho), ApoIA (nacional, na PDPJ), ASSIS (TJRJ), assistente do TJMG, MinutaIA (TJSP), AGAIA (TJGO) e OdinGPT (TJDFT) leem peças e geram resumo ou minuta. Todos os incidentes conhecidos, no Brasil e o de Connecticut (agosto de 2026), são texto escondido em documento. Nenhum tribunal informa qual extrator de PDF usa. |
+| Áudio | **Real hoje** | Transcrição automática em produção seguida de resumo por modelo de linguagem: Transcritor do TJMG ("geração de resumos e análises do conteúdo transcrito para subsidiar a elaboração de decisões judiciais"), audIN do TJBA (aceita arquivo enviado), "degravação inteligente" da ApoIA 2.0 (resumo narrativo automático), ESCRIBA (JFRN), MPRS e MPRJ. O Mídias JT transcreve em toda a Justiça do Trabalho desde setembro de 2025; não há fonte que ligue essa transcrição a um modelo. Nenhum caso de injeção por áudio foi documentado. A Resolução CNJ 615 classifica a transcrição como baixo risco, o que facilita a expansão. |
+| Vídeo | **Real pela trilha de áudio** | Os mesmos sistemas recebem vídeo de audiência e usam só o áudio. Análise de quadros aparece em edital do MPRS (câmeras corporais, 2026) e como capacidade do Gemini licenciado pelo TJMG, sem uso documentado em autos. |
+| Imagem | **Provável em breve, pelo OCR** | 26 projetos de IA do Judiciário declaram OCR (mapeamento do CNJ, dezembro de 2025) e a Nota Técnica CNJ 2635739 cita "imagem submetida a OCR" como local de instrução. Nenhum tribunal documentou modelo de visão lendo imagem juntada; Gemini (TJMG) e Copilot (TJSC) leem imagem, mas o uso depende do magistrado. |
+| Metadados | **Hipotética** | As notas técnicas do CNJ, da CIJMG e do TJSC citam metadado como vetor, por precaução; nenhum sistema documentado entrega metadados ao modelo. |
+| .docx | **Hipotética no tribunal** | O peticionamento é em PDF. O .docx importa para escritórios e órgãos que recebem Word e para quem sobe arquivo num assistente. |
+
+Consequências para o Sentinel: o documento é o produto principal; o áudio é o
+segundo vetor real e entra com a mesma prioridade (no tribunal o caminho é
+fala, transcrição e resumo, então a fala audível com ordem também é
+sinalizada, não só a escondida); na imagem o caminho que importa é o do OCR;
+o vídeo é tratado como áudio mais legendas; metadados e .docx ficam como
+higiene e conformidade com a Nota Técnica do CNJ. Fontes, sistema por sistema:
+[pesquisa/IA-NA-JUSTICA-POR-FORMATO.md](pesquisa/IA-NA-JUSTICA-POR-FORMATO.md).
+
 ## 2. Incidentes reais no mundo
 
 ### 2.1 Citacoes inventadas, o placar global

@@ -36,23 +36,37 @@ detector:
 | Conjunto cego em português jurídico: ataques pegos (60) | 13,3% | **55,0%** (intervalo de 95%: 43 a 67) |
 | Conjunto cego em português jurídico: legítimos sinalizados (60) | 20,0% | **6,7%** (3 a 16) |
 
-Na versão 0.5.0, a inspeção de documento passou a comparar a página
-renderizada com o texto extraído e a ler PDF e .docx inteiros:
+Na versão 0.6.0 a inspeção mede o que a pessoa vê e ouve contra o que a
+máquina lê em documento, imagem, vídeo e áudio. Primeira medida é a rodada
+única num conjunto escrito sem ver o código, antes de qualquer ajuste; depois
+dela o conjunto vira desenvolvimento.
 
-| Medida (0.5.0) | Resultado |
-| --- | --- |
-| Conjunto cego de documentos, escrito sem ver o código: ataques pegos (40) | **34** (85%; intervalo de 95%: 71 a 93) |
-| O mesmo conjunto: legítimos difíceis sinalizados (27) | **1** (3,7%) |
-| Documentos públicos reais nunca vistos sinalizados por engano (437 arquivos, 2.401 páginas) | **2** (0,46%; intervalo: 0,13 a 1,65) |
-| Comandos reais escondidos abaixo do limite de leitura, em qualquer tamanho | **todos** |
+| Medida (0.6.0) | Primeira medida | Depois do ajuste |
+| --- | --- | --- |
+| Documentos: ataques pegos (40) e legítimos difíceis sinalizados (27) | **34** e **1** | 39 e 1 |
+| Imagens: ataques (35) e legítimos (27) | **10** e **1** | 22 e 1 |
+| Vídeo e áudio: ataques (22) e legítimos (18) | **9** e **1** | 14 e 1 |
+| Documentos públicos reais nunca vistos sinalizados por engano (438 arquivos, 2.401 páginas) | **2** | 0 (0 a 0,87%) |
+| Documentos reais com imagens lidas pelo OCR (210) | **0** | 0 |
+| Áudio e vídeo públicos reais (25 recortes de 3 minutos) | **0** | 0 |
+| Atacante que conhece o código: tentativas válidas sinalizadas | **21%** | 77%, e 1% sem nenhum aviso |
 
-Três coisas para ler nessa tabela:
+A Justiça brasileira já lê com IA texto e PDF de peças e a transcrição de
+audiências (resumida por modelo em vários tribunais); a imagem entra pelo
+OCR e o vídeo pela trilha de áudio. O levantamento, sistema por sistema, está
+em [docs/pesquisa/IA-NA-JUSTICA-POR-FORMATO.md](docs/pesquisa/IA-NA-JUSTICA-POR-FORMATO.md).
+
+Quatro coisas para ler nessas tabelas:
 
 * **O ataque real é de forma, e forma se detecta.** Em todos os casos
   brasileiros conhecidos o comando estava invisível. A inspeção de PDF olha cor,
   tamanho e posição do texto, e libera papel timbrado e camada de OCR.
 * **Em documento real quase não incomoda.** Dois sinalizados em 4.007. A versão
   anterior barrava 43% dos acórdãos inteiros do STJ.
+* **Quem conhece as regras passa, mas quase nunca em silêncio.** O atacante
+  adaptativo escapou da sinalização nos dez comandos reais; depois de três
+  rodadas de regras de forma, o que escapa são ordens curtas e secas, e o
+  revisor recebe o aviso de que há texto oculto.
 * **Ordem em linguagem comum passa em cerca de metade das vezes.** No conjunto
   cego, ofuscação é pega em 11 de 12 casos; paráfrase dirigida à IA em 1 de 6,
   exfiltração em 0 de 3, ordem para pular a revisão em 0 de 3.
@@ -266,6 +280,7 @@ print(resultado["status"], resultado["risk_score"], resultado["hitl_required"])
 python -m pytest -q                                           # suíte de testes
 python -m polar_sentinel.benchmarks.agent_safety_bench        # corpus de desenvolvimento
 python -m polar_sentinel.benchmarks.heldout_eval --casos      # validação e conjuntos cegos
+python -m polar_sentinel.benchmarks.atacante_adaptativo     # atacante que conhece o código (pede Poppler)
 
 # conjuntos públicos (ataques escritos por pessoas e textos jurídicos reais)
 pip install -e ".[eval]"
@@ -347,9 +362,16 @@ Polar Sentinel is an open (Apache 2.0) defense layer against prompt injection in
 documents read by AI systems in Brazilian courts. In 2026, several Brazilian
 courts found petitions carrying hidden orders addressed to the AI that reads the
 case file: white text on a white page, text in a 0.8 pt font, text in the color
-of the footer band. Sentinel inspects the PDF for text a human reader cannot see,
-strips hidden channels, looks for orders addressed to the AI, and requires a
-single-use human approval before any irreversible action.
+of the footer band. Since version 0.6.0, Sentinel measures what a person sees and
+hears against what the machine reads, in physical units (contrast, glyph size,
+on-screen duration, speech level), across PDF and .docx, images (OCR, including
+image-scaling attacks), video (flash frames, short subtitles, container
+metadata) and audio (speech far below the main voice). It separates what only
+the model would receive, issues a certificate in the format requested by the
+Brazilian National Council of Justice, checks ICP-Brasil signatures and C2PA
+provenance, and requires a single-use human approval before any irreversible
+action. Brazilian courts already feed party filings and hearing transcriptions
+to language models; images reach them through OCR, video through its audio.
 
 Measured on data it was not written for (details in
 [docs/AVALIACAO.md](docs/AVALIACAO.md), in Portuguese):
@@ -363,6 +385,15 @@ Measured on data it was not written for (details in
 * **Blind set in Brazilian legal Portuguese:** 55.0% of 60 attacks caught
   (95% CI 43 to 67), with 6.7% false positives on 60 deliberately hard
   legitimate documents.
+* **Blind sets, first and only run before tuning:** documents 34 of 40 attacks
+  (1 of 27 legitimate flagged), images 10 of 35 (1 of 27), video and audio 9 of
+  22 (1 of 18).
+* **Real files with no attack:** 0 of 438 unseen public documents, 0 of 210
+  documents with OCR on images, 0 of 25 public audio and video clips.
+* **Adaptive attacker that knows the code:** it evaded flagging for all ten real
+  commands in round one, mostly on the first query. After three rounds of
+  form-based rules, 77% of its valid attempts are flagged and 1% pass with no
+  warning at all; the rest raise a hidden-text warning.
 
 The practical reading: the attack courts are actually seeing is hidden by form,
 and form is cheap to detect precisely. Orders written in ordinary language, with

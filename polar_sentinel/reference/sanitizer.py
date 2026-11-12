@@ -47,7 +47,10 @@ _TYPOGRAPHIC_RE = re.compile("[\u00ad\ufeff]")
 # Invisiveis e de largura zero: U+200B a U+200F (zero width e marcas
 # direcionais); U+2028/U+2029 (separadores); U+2060 a U+2064 (word joiner e
 # invisiveis matematicos); U+FFF9 a U+FFFB (interlinear annotation).
-_INVISIBLE_RE = re.compile("[\u200b-\u200f\u2028\u2029\u2060-\u2064\ufff9-\ufffb]")
+_INVISIBLE_RE = re.compile("[\u200b-\u200f\u2060-\u2064\ufff9-\ufffb]")
+# Separador de linha e de paragrafo: o Word grava a quebra manual (Shift+Enter)
+# como U+2028. E quebra de linha que a pessoa ve, nao caractere escondido.
+_SEPARADOR_DE_LINHA_RE = re.compile("[\u2028\u2029]")
 
 # Controles bidirecionais: U+202A a U+202E (embeddings e override) e
 # U+2066 a U+2069 (isolates). Usados para esconder ou reordenar comandos.
@@ -180,6 +183,7 @@ def sanitize_with_audit(text: str, *, source: str = "desconhecido") -> Sanitizat
         hidden.append(tag_text)
     hidden.extend(m.group(0)[4:-3] for m in _HTML_COMMENT_RE.finditer(text))
 
+    text = _SEPARADOR_DE_LINHA_RE.sub("\n", text)
     text = _strip(_TYPOGRAPHIC_RE, text, "artefato_tipografico", entries)
     text = _strip(_INVISIBLE_RE, text, "invisible_unicode", entries)
     text = _strip(_BIDI_RE, text, "bidi_control", entries)

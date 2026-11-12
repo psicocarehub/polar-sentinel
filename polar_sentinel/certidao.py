@@ -70,6 +70,8 @@ NATUREZA = {
     "objeto_embutido": "objeto embutido",
     "macro": "macro VBA",
     "unicode_invisivel": "caracteres Unicode invisíveis (tag, controle bidirecional ou seletor)",
+    "texto_substituto": "texto substituto (ActualText) que o extrator entrega no lugar do que a "
+    "página mostra",
 }
 
 
@@ -229,10 +231,14 @@ def emitir_certidao(
             }
         )
     for achado in getattr(inspecao, "achados", []):
-        relevante = achado.tipo in _SEMPRE_RELATAR or (
-            achado.texto
-            and tem_ordem(achado.texto)
-            and (achado.tipo != "metadado" or "comando_em_metadado" in veredito.reasons)
+        relevante = (
+            achado.tipo in _SEMPRE_RELATAR
+            or achado.detalhe.get("diverge")
+            or (
+                achado.texto
+                and tem_ordem(achado.texto)
+                and (achado.tipo != "metadado" or "comando_em_metadado" in veredito.reasons)
+            )
         )
         if not relevante or achado.tipo == "revisoes":
             continue
