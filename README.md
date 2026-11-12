@@ -3,13 +3,17 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24143886.svg)](https://doi.org/10.5281/zenodo.24143886)
 
 Camada aberta de defesa contra injeção de comandos (prompt injection) em
-documentos lidos por sistemas de IA do Judiciário brasileiro.
+documentos, imagens, vídeos e áudios lidos por sistemas de IA do Judiciário
+brasileiro.
 
-Fica entre o documento e o modelo: inspeciona o PDF em busca de texto que o
-leitor humano não vê, redige dados pessoais, remove canais ocultos, procura
+Fica entre o arquivo e o modelo: mede o que a pessoa vê e ouve contra o que a
+máquina lê (contraste, tamanho, duração, volume), separa o que só o modelo
+receberia, confere assinatura ICP-Brasil e selo de origem C2PA, redige dados
+pessoais, remove canais ocultos, procura
 ordens dirigidas à IA que vai ler a peça e exige aprovação humana de uso único
-antes de qualquer ação irreversível. O núcleo é Python puro, sem dependências, e
-as etapas de defesa não fazem chamada de rede. Licença Apache 2.0.
+antes de qualquer ação irreversível. O núcleo é Python puro, sem dependências; as
+leituras de arquivo usam extras opcionais. As etapas de defesa não fazem
+chamada de rede. Licença Apache 2.0.
 
 **Teste no navegador:** https://psicocarehub.github.io/polar-sentinel/ traz petições
 de exemplo com os comandos que tribunais publicaram escondidos no PDF. O arquivo é
@@ -85,7 +89,10 @@ O panorama, com incidentes e referências, está em
 
 | Etapa | O que faz | Estado neste repositório |
 | --- | --- | --- |
-| Inspeção de PDF | Separa o texto visível do texto na cor do fundo, em fonte minúscula ou fora da página | Implementado (pede `pypdf`) |
+| Inspeção de documento | Mede cada caractere de PDF e .docx contra a página renderizada; lê anotações, campos, anexos, metadados e a camada de OCR | Implementado (extra `pdf`) |
+| Inspeção de imagem | Texto de baixo contraste, em pixels transparentes, revelado por redução de escala, e metadados | Implementado (extra `midia` e Tesseract) |
+| Inspeção de vídeo e áudio | Legendas e quadros relâmpago, metadados, fala muito abaixo da principal, dois transcritores | Implementado (extra `midia`, ffmpeg e Tesseract) |
+| Integridade e proveniência | Assinaturas de PDF contra as raízes da ICP-Brasil, alteração depois da assinatura, manifesto C2PA | Implementado (extra `autenticidade`) |
 | Filtro de dados pessoais | Redige CPF, CNPJ, RG, e-mail, telefone, CEP e conta bancária | Implementado, por expressões regulares |
 | Leitura segura do documento | Remove caracteres invisíveis, controles bidirecionais, tag characters, seletores de variação, comentários HTML e sequências ANSI, com trilha do que saiu | Implementado |
 | Detector de comandos | Procura ordens dirigidas à IA no texto limpo e no conteúdo que estava oculto | Implementado |
@@ -93,20 +100,34 @@ O panorama, com incidentes e referências, está em
 | Aprovação humana | Portão de uso único, com validade e conferência de hash | Implementado |
 | Registro e auditoria | Trilha por etapa no resultado do orquestrador | Padrão de referência: não há armazenamento |
 
-O que este repositório não traz: manuseio de certificado ICP-Brasil, integrações
-com PJe e eproc, classificador treinado ou camada semântica com modelo.
+O que este repositório não traz: assinatura de documentos, integrações com PJe e
+eproc, classificador treinado, camada semântica com modelo, separação de vozes
+no áudio e detector de "deepfake".
 
 ## Instalação
 
 ```bash
-pip install -e .
-# extras opcionais
-pip install -e ".[pdf]"   # inspeção de PDF
-pip install -e ".[lab]"   # laboratório visual e geração de PDFs
-pip install -e ".[eval]"  # medida em conjuntos públicos
-pip install -e ".[http]"  # adaptadores de API externa
-pip install -e ".[dev]"   # testes e lint
+pip install polar-sentinel                       # núcleo: texto, detector, aprovação
+pip install "polar-sentinel[pdf]"                # PDF e .docx
+pip install "polar-sentinel[midia]"              # imagem, vídeo e áudio
+pip install "polar-sentinel[autenticidade]"      # assinaturas ICP-Brasil e C2PA
+pip install "polar-sentinel[completo]"           # tudo acima
 ```
+
+Imagem, vídeo e áudio também pedem programas do sistema e modelos de fala:
+
+```bash
+brew install tesseract tesseract-lang ffmpeg                        # macOS
+sudo apt-get install tesseract-ocr tesseract-ocr-por ffmpeg         # Debian e Ubuntu
+python -m polar_sentinel.modelos     # baixa o Whisper e o Vosk pequeno de português
+```
+
+Sem o Tesseract, os quadros de vídeo e as imagens não são lidos; sem o
+faster-whisper, o áudio não é transcrito; sem o modelo do Vosk, falta a
+comparação entre dois transcritores. Em todos esses casos a certidão diz o que
+ficou de fora ("Leitura feita sem: ...") em vez de calar.
+
+Para desenvolver: `pip install -e ".[dev,lab,eval,completo]"`.
 
 ## Uso rápido
 
@@ -145,6 +166,40 @@ oculto, na cor do sombreamento, minúsculo, excluído com controle de
 alterações, comentários, texto alternativo e códigos de campo.
 
 O trecho oculto é devolvido para ser registrado nos autos, não descartado.
+
+### Imagem, vídeo e áudio
+
+```bash
+pip install "polar-sentinel[completo]" && python -m polar_sentinel.modelos
+python -m polar_sentinel.certidao prova.jpg
+python -m polar_sentinel.certidao audiencia.mp4
+python -m polar_sentinel.certidao depoimento.opus
+```
+
+* **Imagem:** letra quase da cor do papel ou do fundo (inclusive amarelo claro e
+  fundo escuro), texto nos pixels transparentes, texto que só aparece quando a
+  imagem é reduzida sem suavização para o tamanho de entrada de um modelo
+  (ataque de escala) e ordem em EXIF, XMP, PNG ou comentário de JPEG. PDF
+  digitalizado sem camada de texto passa a ser lido.
+* **Vídeo:** metadados e capítulos, faixas de legenda, legenda que fica um
+  instante na tela, quadro relâmpago entre dois cortes, texto apagado nos
+  quadros e o áudio de cada faixa.
+* **Áudio:** fala muito abaixo da fala principal, acelerada ou encoberta, que o
+  transcritor pega e a pessoa não ouve; dois transcritores de famílias
+  diferentes comparados.
+
+### Integridade e proveniência
+
+```bash
+python -m polar_sentinel.laudo peca_assinada.pdf
+python -m polar_sentinel.laudo foto.jpg
+```
+
+O laudo valida as assinaturas do PDF contra as raízes da ICP-Brasil, diz se o
+conteúdo visível mudou depois de cada assinatura e mostra onde, e lê o
+manifesto C2PA de fotos e vídeos. A conclusão tem três saídas: integridade
+confirmada, alteração detectada ou inconclusivo. Prova integridade, não
+veracidade, e não dá nota de "deepfake".
 
 ### Leitura segura
 

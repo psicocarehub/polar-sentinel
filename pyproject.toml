@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "polar-sentinel"
-version = "0.5.0"
+version = "0.6.0"
 description = "Camada aberta de defesa em profundidade para uso seguro e soberano de IA no Judiciario brasileiro."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -36,6 +36,15 @@ lab = ["streamlit>=1.33", "pypdf>=4.0", "reportlab>=4.0"]
 # e certidao. Sem pypdfium2 e numpy, a inspecao cai para a leitura do conteudo.
 # A conferencia de paginas digitalizadas usa o Tesseract, se estiver instalado.
 pdf = ["pypdf>=4.0", "pypdfium2>=4.30", "numpy>=1.24", "pillow>=10.1"]
+# Imagem, video e audio: Tesseract e ffmpeg vem do sistema; transcricao com
+# faster-whisper (e Vosk, opcional, com o modelo pequeno em portugues).
+midia = ["numpy>=1.24", "pillow>=10.1", "scipy>=1.10", "faster-whisper>=1.0", "vosk>=0.3.44"]
+# Integridade e proveniencia: assinaturas de PDF (ICP-Brasil) e manifestos C2PA
+autenticidade = ["pyhanko>=0.25", "c2pa-python>=0.10", "pypdf>=4.0", "pypdfium2>=4.30"]
+completo = [
+    "pypdf>=4.0", "pypdfium2>=4.30", "numpy>=1.24", "pillow>=10.1", "scipy>=1.10",
+    "faster-whisper>=1.0", "vosk>=0.3.44", "pyhanko>=0.25", "c2pa-python>=0.10",
+]
 # Medida em dados publicos (leitura dos parquet baixados)
 eval = ["pyarrow>=14.0"]
 # Cliente HTTP para adapters de API externa
@@ -47,10 +56,14 @@ dev = ["pytest>=8.2", "pytest-cov>=4.0", "ruff>=0.4"]
 Homepage = "https://github.com/psicocarehub/polar-sentinel"
 Documentation = "https://github.com/psicocarehub/polar-sentinel/tree/main/docs"
 
+[tool.setuptools.package-data]
+"polar_sentinel.reference.icp_brasil" = ["*.pem", "LEIA-ME.md"]
+
 [tool.setuptools]
 packages = [
     "polar_sentinel",
     "polar_sentinel.reference",
+    "polar_sentinel.reference.icp_brasil",
     "polar_sentinel.harness",
     "polar_sentinel.benchmarks",
     "polar_sentinel.attacks",

@@ -117,6 +117,8 @@ class PaginaPercebida:
     altura: float
     caracteres: List[Caractere] = field(default_factory=list)
     tem_imagem: bool = False
+    # Leitura das imagens da pagina (reference/imagem_inspector.py), quando feita.
+    imagem: Any = None
 
 
 def _bytes_de(source: Union[str, Path, bytes, Any]) -> bytes:
@@ -454,18 +456,61 @@ def texto_visivel(pagina: PaginaPercebida) -> str:
     )
 
 
+def _escala_das_imagens(page) -> float:
+    """Pixels por ponto que preservam a resolucao da imagem mais fina da pagina (2 a 4)."""
+    import pypdfium2.raw as raw
+
+    melhor = 2.0
+    for objeto in _objetos(page, raw.FPDF_PAGEOBJ_IMAGE):
+        largura_px, altura_px = ctypes.c_uint(), ctypes.c_uint()
+        if not raw.FPDFImageObj_GetImagePixelSize(objeto.raw, largura_px, altura_px):
+            continue
+        esq, base, dir_, topo = _limites(objeto)
+        if dir_ - esq > 50 and topo - base > 50:
+            melhor = max(melhor, largura_px.value / (dir_ - esq), altura_px.value / (topo - base))
+    return min(melhor, 4.0)
+
+
+def ler_imagens_da_pagina(page, pagina: PaginaPercebida, escala: Optional[float] = None) -> None:
+    """Le as imagens da pagina (sem o texto) com o inspetor de imagem.
+
+    A pagina e desenhada na resolucao da imagem que ela traz (ate 288 dpi),
+    para que letra miuda de um digitalizado de 300 dpi nao se perca.
+    """
+    import numpy as np
+    import pypdfium2.raw as raw
+    from PIL import Image
+
+    from polar_sentinel.reference.imagem_inspector import inspecionar_imagem
+
+    escala = escala or _escala_das_imagens(page)
+    for objeto in _objetos(page, raw.FPDF_PAGEOBJ_TEXT):
+        raw.FPDFPageObj_SetIsActive(objeto.raw, False)
+    bitmap = page.render(scale=escala, draw_annots=False, may_draw_forms=False, rev_byteorder=True)
+    imagem = Image.fromarray(np.array(bitmap.to_numpy()[..., :3], dtype=np.uint8))
+    pagina.imagem = inspecionar_imagem(
+        imagem, pt_por_px=1 / escala, pagina=pagina.numero, reducao=False
+    )
+
+
 def perceber_pdf(
-    source: Union[str, Path, bytes, Any], conferir_ocr: Optional[bool] = None
+    source: Union[str, Path, bytes, Any],
+    conferir_ocr: Optional[bool] = None,
+    ler_imagens: Optional[bool] = None,
 ) -> List[PaginaPercebida]:
     """Mede todas as paginas de um PDF.
 
     `conferir_ocr` confere a camada de texto das paginas digitalizadas com o
-    Tesseract; sem escolha, confere quando ele esta instalado.
+    Tesseract; `ler_imagens` le as imagens das paginas que tem imagem (o
+    digitalizado sem camada de texto, a ordem apagada dentro de uma figura).
+    Sem escolha, os dois rodam quando o Tesseract esta instalado.
     """
     import pypdfium2 as pdfium
 
     if conferir_ocr is None:
         conferir_ocr = tesseract_disponivel()
+    if ler_imagens is None:
+        ler_imagens = tesseract_disponivel()
     tabela = _tabela_linear()
     documento = pdfium.PdfDocument(io.BytesIO(_bytes_de(source)))
     try:
@@ -475,6 +520,8 @@ def perceber_pdf(
             pagina = medir_pagina(page, i + 1, tabela)
             if conferir_ocr:
                 conferir_camada_ocr(page, pagina)
+            if ler_imagens and pagina.tem_imagem:
+                ler_imagens_da_pagina(page, pagina)
             paginas.append(pagina)
         return paginas
     finally:

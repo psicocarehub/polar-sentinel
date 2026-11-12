@@ -179,13 +179,53 @@ def _metadados(reader) -> List[Achado]:
     return achados
 
 
+def _metadados_de_imagens(reader) -> List[Achado]:
+    """Comentario, EXIF e XMP dos JPEG embutidos nas paginas."""
+    try:
+        from PIL import Image
+
+        from polar_sentinel.reference.imagem_inspector import metadados_da_imagem
+    except ImportError:
+        return []
+    achados: List[Achado] = []
+    for numero, page in enumerate(reader.pages, start=1):
+        recursos = page.get("/Resources")
+        xobjetos = recursos.get_object().get("/XObject") if recursos is not None else None
+        if xobjetos is None:
+            continue
+        for nome, ref in xobjetos.get_object().items():
+            objeto = ref.get_object()
+            filtro = objeto.get("/Filter")
+            filtros = filtro if isinstance(filtro, list) else [filtro]
+            if objeto.get("/Subtype") != "/Image" or "/DCTDecode" not in [str(f) for f in filtros]:
+                continue
+            try:
+                imagem = Image.open(io.BytesIO(objeto.get_data()))
+            except Exception:  # noqa: BLE001
+                continue
+            for a in metadados_da_imagem(imagem):
+                achados.append(
+                    Achado(
+                        "metadado_de_imagem", a.texto, numero, {**a.detalhe, "imagem": str(nome)}
+                    )
+                )
+    return achados
+
+
 def inspecionar_estrutura(dados: bytes, profundidade: int = 1) -> List[Achado]:
     """Lista os canais fora do texto da pagina. `dados` e o PDF em bytes."""
     from pypdf import PdfReader
 
     reader = PdfReader(io.BytesIO(dados))
     achados: List[Achado] = []
-    for coletor in (_anotacoes, _camadas_desligadas, _javascript_do_documento, _metadados):
+    coletores = (
+        _anotacoes,
+        _camadas_desligadas,
+        _javascript_do_documento,
+        _metadados,
+        _metadados_de_imagens,
+    )
+    for coletor in coletores:
         try:
             achados.extend(coletor(reader))
         except Exception as exc:  # noqa: BLE001 - PDF malformado nao derruba a inspecao

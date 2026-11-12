@@ -78,10 +78,22 @@ _RADICAIS = re.compile(
     "negue|interprete|favoravel|integralmenteprovido|conhecidoeprovido|sevoceeum|"
     "conceda|classifique|sugira|declare|registre"
 )
-# Termo de IA, para os canais em que imperativo sozinho e comum (metadados).
+# Termo de IA ou sinal de leitura por maquina, para os canais em que
+# imperativo sozinho e comum (metadados): "ao transcrever", "instrucoes
+# anteriores", "sem avisar".
 _TERMO_DE_IA = re.compile(
     r"\b(?:" + _AI_TERM + r")|\b(?:chat|gpt|chatgpt|llm|ia|leitor(?:es)? automatizad\w*|"
-    r"sistemas? automatizad\w*)\b"
+    r"sistemas? automatizad\w*|(?:ao|para o|aos) modelos?|"
+    r"ao (?:transcrever|analisar|resumir|ler|processar|interpretar|descrever)|"
+    r"(?:orientacoes|instrucoes|comandos|regras) anteriores|sem (?:avisar|informar|mencionar))\b"
+    # vocativo curto seguido de dois-pontos: "Assistente: nao transcreva..."
+    r"|\b(?:assistente|modelo|sistema|agente|ia|leitor\w*|transcritor)\s*:"
+)
+# Ordens de adulteracao que nao estao no detector de texto, que trabalha sobre
+# texto visivel e evita verbos comuns em peca. Aqui so valem em canal oculto.
+_ORDEM_DE_ADULTERACAO = re.compile(
+    r"\b(?:substitua|troque|altere|elogie|rejeite|esqueca|apague|acrescente|modifique|"
+    r"mude|inverta|minimize|exagere|enfatize)\b"
 )
 # Bloco sem espaco maior que isto nao e palavra partida (base64, hash).
 _MAX_PEDACO = 20
@@ -94,6 +106,7 @@ _CANAIS_COM_TEXTO = {
     "javascript": "ordem_em_javascript",
     "link": "ordem_em_link",
     "metadado": "comando_em_metadado",
+    "metadado_de_imagem": "comando_em_metadado_de_imagem",
 }
 
 
@@ -232,9 +245,21 @@ def tem_ordem(texto: str, stage: str = "entrada") -> bool:
     texto = sanitize_with_audit(texto).text  # tira largura zero entre as letras
     dobrado = fold(texto)
     pedacos = " ".join(p for p in dobrado.split() if len(p) <= _MAX_PEDACO)
-    if _ORDER_RE.search(dobrado) or _RADICAIS.search(re.sub(r"[^a-z]", "", pedacos)):
+    if (_ORDER_RE.search(dobrado) or _ORDEM_DE_ADULTERACAO.search(dobrado)
+            or _RADICAIS.search(re.sub(r"[^a-z]", "", pedacos))):
         return True
     return detect_suspicious_patterns(texto, stage)[0] > 0.2
+
+
+def _invisivel_em_imagem(motivo: str, texto: str) -> bool:
+    """Texto de imagem que a pessoa nao ve e que tem palavras de verdade bastantes."""
+    from polar_sentinel.reference.imagem_inspector import (
+        INVISIVEL_EM_IMAGEM,
+        MIN_PALAVRAS_INVISIVEIS,
+        _palavras_reais,
+    )
+
+    return motivo in INVISIVEL_EM_IMAGEM and _palavras_reais(texto) >= MIN_PALAVRAS_INVISIVEIS
 
 
 def dirigido_a_ia(texto: str, stage: str = "entrada") -> bool:
@@ -249,7 +274,8 @@ def parece_texto(texto: str) -> bool:
     if not visiveis:
         return False
     letras = sum(ch.isalpha() for ch in visiveis)
-    palavras = [p for p in re.findall(r"[^\W\d_]{3,}", texto) if re.search(r"[aeiouáéíóúâêôãõ]", p, re.I)]
+    palavras = [p for p in re.findall(r"[^\W\d_]{3,}", texto)
+                if re.search(r"[aeiouáéíóúâêôãõ]", p, re.I)]
     return letras / len(visiveis) >= 0.6 and len(palavras) >= 2
 
 
@@ -269,10 +295,21 @@ def _pela_renderizacao(dados: bytes) -> Tuple[str, List[HiddenSpan], int]:
     from polar_sentinel.reference.pdf_percepcao import agrupar, perceber_pdf, texto_visivel
 
     paginas = perceber_pdf(dados)
-    visivel = "\n".join(texto_visivel(p) for p in paginas)
-    ocultos = [HiddenSpan(t["pagina"], t["texto"], t["motivo"], t["medidas"])
-               for p in paginas for t in agrupar(p) if t["motivo"] != "camada_ocr"]
-    return visivel, ocultos, len(paginas)
+    textos: List[str] = []
+    ocultos: List[HiddenSpan] = []
+    for p in paginas:
+        texto = texto_visivel(p)
+        ocultos.extend(HiddenSpan(t["pagina"], t["texto"], t["motivo"], t["medidas"])
+                       for t in agrupar(p) if t["motivo"] != "camada_ocr")
+        if p.imagem is not None:
+            # Pagina so de imagem (digitalizado sem camada de texto): o que se le
+            # nela e o texto visivel da pagina.
+            if not texto.strip():
+                texto = p.imagem.visible_text
+            ocultos.extend(HiddenSpan(p.numero, t.texto, "imagem_" + t.motivo, t.medidas)
+                           for t in p.imagem.hidden_spans)
+        textos.append(texto)
+    return "\n".join(textos), ocultos, len(paginas)
 
 
 def _pelo_conteudo(dados: bytes) -> Tuple[str, List[HiddenSpan], int]:
@@ -335,7 +372,10 @@ def evaluate_pdf(source: Union[str, Path, Any], stage: str = "entrada",
             reasons.append("texto_em_fonte_minuscula")
         elif tem_ordem(text, stage):
             reasons.append(f"ordem_em_texto_oculto ({reason})")
-        elif letters >= _MIN_LETTERS and reason != "baixo_contraste":
+        elif _invisivel_em_imagem(reason, text):
+            reasons.append(f"texto_invisivel_legivel_por_maquina ({reason})")
+        elif (letters >= _MIN_LETTERS and parece_texto(text)
+              and not reason.endswith("baixo_contraste")):
             atencao.append(f"texto_oculto_sem_ordem ({reason})")
 
     for achado in inspection.achados:
@@ -347,7 +387,7 @@ def evaluate_pdf(source: Union[str, Path, Any], stage: str = "entrada",
             continue
         sinal = _CANAIS_COM_TEXTO.get(achado.tipo)
         if sinal and achado.texto and tem_ordem(achado.texto, stage):
-            if achado.tipo != "metadado" or dirigido_a_ia(achado.texto, stage):
+            if not achado.tipo.startswith("metadado") or dirigido_a_ia(achado.texto, stage):
                 reasons.append(sinal)
         if achado.tipo in ("javascript", "arquivo_embutido", "camada_desligada"):
             atencao.append(achado.tipo)

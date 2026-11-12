@@ -2,6 +2,46 @@
 
 Formato baseado em Keep a Changelog. Versionamento semantico.
 
+## 0.6.0 (em preparo, nao publicado)
+
+Imagem, video, audio e autenticidade.
+
+### Adicionado
+
+* Imagem (`reference/imagem_inspector.py`): o Tesseract le a imagem como esta e
+  numa vista amplificada, em que o que difere um pouco do papel em volta (mais
+  claro ou mais escuro, em qualquer canal de cor) vira preto. Cada linha ganha
+  contraste e tamanho medidos na imagem original. Acha letra quase da cor do
+  papel ou do fundo escuro, amarelo claro sobre branco, texto nos pixels
+  transparentes, texto que so aparece quando a imagem e reduzida sem
+  suavizacao para tamanhos de entrada de modelo (ataque de escala, com um
+  sinal barato que escolhe quais reducoes ler) e ordem em EXIF, XMP, PNG e
+  comentario de JPEG.
+* PDF digitalizado sem camada de texto passa a ser lido; imagens de pagina sao
+  lidas na resolucao da imagem; metadados de JPEG embutido em PDF; imagens de
+  `.docx`.
+* Video (`reference/video_inspector.py`, ffmpeg): metadados e capitulos do
+  conteiner, faixas de legenda lidas inteiras, legenda que fica menos de 0,3 s
+  na tela, quadro relampago entre dois cortes (menos de 0,25 s) lido com o
+  inspetor de imagem, quadros amostrados com texto apagado, faixas extras.
+* Audio (`reference/audio_inspector.py`, faster-whisper e Vosk): fala 20 dB ou
+  mais abaixo da fala principal sai do texto "ouvido" e e relatada; versoes
+  com volume normalizado, faixa de voz isolada e audio desacelerado revelam
+  fala escondida; dois transcritores de familias diferentes comparados;
+  trecho com voz e sem transcricao; energia acima de 18 kHz.
+* Autenticidade (`reference/autenticidade.py`, `python -m polar_sentinel.laudo`):
+  assinaturas de PDF validadas pelo pyHanko contra as raizes da ICP-Brasil
+  (v5, v10, v11 e v12, no pacote), nivel de modificacao depois de cada
+  assinatura e diferenca visual entre a revisao assinada e a atual, com a
+  regiao; assinatura legada adbe.pkcs7.sha1 com o hash conferido; manifesto
+  C2PA (presenca, validade, assinante, declaracao de geracao por IA). Tres
+  conclusoes: integridade confirmada, alteracao detectada, inconclusivo.
+* A certidao aceita imagem, video e audio, com instantes e duracoes.
+* `python -m polar_sentinel.modelos` baixa o Whisper e o Vosk pequeno de
+  portugues. Quando falta Tesseract, faster-whisper ou o modelo do Vosk, a
+  leitura registra o que ficou de fora e a certidao mostra ("Leitura feita
+  sem: ...").
+
 ## 0.5.0
 
 Documento completo: o que a pessoa ve contra o que a maquina le.

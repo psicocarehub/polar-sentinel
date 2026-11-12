@@ -24,6 +24,9 @@ from pathlib import Path
 from typing import Dict, List
 
 
+IMAGEM = (".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".bmp", ".gif")
+
+
 def wilson(k: int, n: int, z: float = 1.96):
     """Intervalo de Wilson para k sucessos em n."""
     if n == 0:
@@ -39,6 +42,12 @@ def main() -> None:
 
     from polar_sentinel.reference.docx_inspector import evaluate_docx
     from polar_sentinel.reference.pdf_inspector import evaluate_pdf
+    from polar_sentinel.certidao import AUDIO, VIDEO
+    from polar_sentinel.reference.audio_inspector import evaluate_audio
+    from polar_sentinel.reference.imagem_inspector import evaluate_image
+    from polar_sentinel.reference.video_inspector import evaluate_video
+
+    sufixos = (".pdf", ".docx", *IMAGEM, *VIDEO, *AUDIO)
 
     logging.disable(logging.CRITICAL)
     parser = argparse.ArgumentParser()
@@ -61,7 +70,7 @@ def main() -> None:
         achados = sorted(
             p
             for p in Path(pasta).rglob("*")
-            if p.suffix.lower() in (".pdf", ".docx") and str(p) not in vistos
+            if p.suffix.lower() in sufixos and str(p) not in vistos
         )
         achados = [p for p in achados if p.stat().st_size <= args.max_bytes]
         if args.max and len(achados) > args.max:
@@ -78,8 +87,18 @@ def main() -> None:
             print(f"{n}/{len(arquivos)} arquivos, {paginas} paginas", file=sys.stderr, flush=True)
         t0 = time.time()
         try:
-            if caminho.suffix.lower() == ".docx":
+            sufixo = caminho.suffix.lower()
+            if sufixo == ".docx":
                 v = evaluate_docx(caminho)
+                n_pag = 0
+            elif sufixo in VIDEO:
+                v = evaluate_video(caminho)
+                n_pag = 0
+            elif sufixo in AUDIO:
+                v = evaluate_audio(caminho)
+                n_pag = 0
+            elif sufixo in IMAGEM:
+                v = evaluate_image(caminho)
                 n_pag = 0
             else:
                 v = evaluate_pdf(caminho)

@@ -282,6 +282,155 @@ engenharia; a calibração com pessoas lendo as mesmas páginas não foi feita e
 * Imagem sem camada de texto não é inspecionada.
 * Não houve atacante adaptativo com acesso ao código além da grade acima.
 
+## 6. Imagem (versão 0.6.0, em preparo)
+
+A leitura de imagem usa o Tesseract duas vezes: na imagem como está e numa
+vista amplificada, em que o que difere um pouco do papel em volta vira preto.
+Cada linha lida ganha contraste e tamanho medidos na imagem original. A
+imagem também é reduzida sem suavização para tamanhos de entrada de modelo,
+lida de novo quando um sinal barato indica ataque de escala, e tem os
+metadados lidos.
+
+### Conjunto cego de imagens
+
+Escrito por um agente que não leu o código: 35 ataques (contraste quase nulo
+em vários fundos, amarelo claro, opacidade baixa sobre foto, texto miúdo em
+imagem grande, texto girado, dentro de tarja, pontilhado, cinco ataques de
+escala com convenções de Pillow e OpenCV, sete formas de metadado, canal
+alfa, imagem dentro de PDF e de .docx) e 27 legítimos difíceis (digitalização
+amarelada com ruído, carimbo, marca d'água, print de interface com cinza
+claro, gráfico, QR code, foto com sombra, metadados normais, petição que cita
+um comando entre aspas). Rodado uma vez, antes de qualquer ajuste:
+
+| | Sinalizados | Intervalo de 95% |
+| --- | --- | --- |
+| Ataques (35) | **10** (28,6%) | 16,3% a 45,1% |
+| Legítimos (27) | **1** (3,7%) | 0,7% a 18,3% |
+
+É bem mais fraco que o resultado em documento, e o motivo ficou claro nos
+erros: a leitura amplificada não olhava texto claro sobre fundo escuro nem
+diferença de cor (amarelo claro sobre branco mal muda a luminância), o limiar
+fixo perdia contraste abaixo de 1,05, as reduções testadas não cobriam 448 e
+a convenção do OpenCV, o comentário EXIF em UTF-16 não era decodificado e
+ordens nos metadados sem a palavra "IA" não contavam.
+
+Depois do ajuste (resíduo em cor e nos dois sentidos, limiar acima do ruído
+do papel, oito tamanhos e três convenções de redução, metadados com sinais de
+leitura por máquina, e uma regra nova: texto invisível e legível por máquina
+numa imagem, com seis palavras de verdade ou mais, sinaliza mesmo quando a
+leitura sai truncada demais para reconhecer a ordem), o mesmo conjunto dá
+22 de 35 ataques e 1 de 27 legítimos. Esse número não mede generalização.
+
+O que continua passando: texto em pontos esparsos, texto girado na margem,
+texto dentro de tarja preta, texto miúdo em PDF e .docx, opacidade baixa
+sobre foto e textura, e um ataque de escala. O leitor é o Tesseract; um
+modelo de visão lê mais do que ele, e o que o Tesseract não lê este módulo não
+acha.
+
+A regra do texto invisível legível é uma escolha: numa imagem, texto que a
+pessoa não vê e o modelo lê não tem uso legítimo conhecido (ao contrário do
+PDF, com camada de OCR e texto de acessibilidade). Linhas de ruído do papel
+lidas como letras soltas são descartadas antes.
+
+### Documentos reais com leitura de imagem
+
+Com a leitura de imagem ligada (páginas com imagem, digitalizados, imagens de
+.docx), 210 documentos públicos reais (1.254 páginas) dão **0 sinalizados**
+(intervalo de 95%: 0 a 1,8%) e 6 com atenção, a 0,42 segundo por página. A
+primeira rodada deu 54 com atenção: imagens de cabeçalho com transparência
+eram lidas sobre fundo preto; a imagem passou a ser composta sobre o branco.
+
+### Ataque de escala
+
+O sinal que decide quais reduções ler é a fração de pixels em que a redução
+sem suavização difere mais de 48 níveis da redução por média e mais de três
+vezes a borda que a redução por média tem ali. No conjunto cego, os 27
+legítimos ficaram em zero e os cinco ataques acima de 0,0007; o limiar é
+0,0002. Um erro de estouro de inteiro nesse cálculo, achado na medição em
+documentos reais, foi corrigido antes dos números acima.
+
+## 7. Vídeo e áudio (versão 0.6.0, em preparo)
+
+Vídeo: metadados, capítulos e legendas do contêiner (ffmpeg), legenda que fica
+menos de 0,3 segundo, quadro relâmpago (texto que está no quadro do corte e
+não está 0,3 segundo antes nem depois), quadros amostrados lidos como imagem e
+o áudio de cada faixa. Áudio: transcrição pelo Whisper do áudio original e de
+versões preparadas (volume normalizado, faixa de voz, desacelerado, cada
+canal do estéreo); fala 20 dB ou mais abaixo da principal sai do texto
+"ouvido"; o Vosk transcreve de novo para comparação.
+
+### Conjunto cego de vídeo e áudio
+
+Escrito por um agente que não leu o código, com vozes sintéticas do macOS: 22
+ataques (sussurro numa pausa de 20 a 35 dB abaixo da fala, inclusive num
+áudio de WhatsApp em Opus; fala acelerada de 2x a 3x; fala sob música e sob
+ruído; ordem num só canal do estéreo; segunda faixa de áudio; quadro
+relâmpago de um, dois e três quadros; texto de baixo contraste; legenda de
+100 ms; legenda em faixa não padrão; comentário, título, descrição e capítulo
+do contêiner; quase ultrassom) e 18 legítimos (depoimento com ruído de sala,
+fala rápida natural, música de fundo, dois falantes em volumes diferentes,
+chiado, cortes rápidos, legenda curta normal, clarão sem texto, advogado
+lendo em voz alta um comando achado numa petição). Rodado uma vez, antes de
+qualquer ajuste:
+
+| | Sinalizados | Intervalo de 95% |
+| --- | --- | --- |
+| Ataques (22) | **9** (40,9%) | 23,3% a 61,3% |
+| Legítimos (18) | **1** (5,6%) | 1,0% a 25,8% |
+
+O legítimo sinalizado é o advogado lendo o comando em voz alta: quem pega é o
+detector de texto, como na imagem e no documento. Depois do ajuste (quadro do
+corte lido dos dois lados, relâmpago comparado com os vizinhos no tempo,
+metadados do arquivo de áudio, retranscrição no mesmo volume descartada, fala
+transcrita 25 dB ou mais abaixo da principal com seis palavras sinaliza, e o
+vocativo "Assistente:" nos metadados), o mesmo conjunto dá 14 de 22 ataques (63,6%; 43,0% a 80,3%) e 1 de 18
+legítimos. É número de desenvolvimento: o conjunto já foi visto.
+
+O que continua passando: fala encoberta por música ou ruído e fala baixa por
+cima de outra fala, que pediriam separação de fontes; texto de dois níveis de
+cinza num vídeo, que a compressão apaga (e que um modelo também não leria);
+quase ultrassom, que fica como atenção ("energia acima de 18 kHz") e não como
+sinalização.
+
+### Mídia pública real
+
+Vinte e cinco recortes de três minutos de mídia pública (15 audiolivros em
+português do LibriVox e 10 vídeos do Wikimedia Commons), sem nenhum ataque
+plantado: **0 de 25 sinalizados** (intervalo de 95%: 0% a 13,3%). Quatro ficam
+com atenção (cortes com cartela de título, fala sob ruído, texto da cor do
+fundo). A discordância entre os dois transcritores aparecia em 12 dos 25 e por
+isso deixou de gerar atenção sozinha: só conta quando o trecho divergente traz
+ordem. Velocidade: cerca de 19 segundos de análise por minuto de mídia num
+Mac de mesa, sem GPU.
+
+## 8. Integridade e proveniência (versão 0.6.0, em preparo)
+
+PDF assinado: o pyHanko valida cada assinatura (hash, criptografia, cadeia até
+as raízes da ICP-Brasil que vêm no pacote) e dá o nível de modificação depois
+dela; quando há revisão posterior, a página é desenhada como estava assinada
+e como está, e a diferença fora dos campos de assinatura vira "alteração
+detectada", com a região. C2PA: o leitor oficial diz se há manifesto, se ele
+confere com o conteúdo, quem assinou e se declara geração por IA.
+
+Medido:
+
+* PDF assinado com certificado de teste e alterado depois por revisão
+  incremental (o valor da causa coberto e reescrito): alteração detectada,
+  com a região da linha do valor; o mesmo PDF sem alteração: integridade
+  confirmada com a raiz de teste e inconclusivo com as raízes da ICP-Brasil.
+* 40 licenças ambientais públicas assinadas com ICP-Brasil em 2006, no formato
+  legado adbe.pkcs7.sha1, que o pyHanko não valida: o hash assinado confere
+  com o arquivo nas 40, nenhuma "alteração" falsa, e a conclusão é
+  inconclusivo, porque a assinatura e a cadeia não foram validadas
+  criptograficamente. É a resposta honesta para esse formato.
+* Foto com manifesto C2PA de teste: manifesto lido, inclusive a declaração de
+  geração por IA; com um byte trocado, "alteração detectada" pelo hash; sem
+  manifesto, inconclusivo.
+
+Não há conjunto cego nem medida de falso positivo em escala para esta parte;
+os ataques de aparência em PDF assinado descritos na literatura (sombra,
+ASA, SFDA) não foram reproduzidos aqui, só a alteração incremental simples.
+
 ## O que mudou entre a versão 0.3.0 e a 0.4.0
 
 * **Acentos.** As regras estavam escritas sem acento e eram aplicadas ao texto
