@@ -2,9 +2,9 @@
 
 Formato baseado em Keep a Changelog. Versionamento semantico.
 
-## 0.6.0 (em preparo, nao publicado)
+## 0.6.0 (12/11/2026)
 
-Imagem, video, audio e autenticidade.
+Imagem, video, audio e autenticidade; atacante adaptativo e peticoes reais.
 
 ### Adicionado
 
@@ -63,6 +63,25 @@ Imagem, video, audio e autenticidade.
 * O extra `midia` pedia `vosk>=0.3.45`, versao que nao existe.
 * A certidao dizia "ordem em conteudo que o leitor nao ve" tambem quando a
   ordem estava no texto visivel ou na fala audivel.
+* Falsos positivos achados em 402 peticoes reais (59 na primeira passada, 29
+  delas ja na 0.5.0), cada um com teste em `tests/test_peticoes_reais.py`:
+  * tarja preta ou branca sobre CPF, endereco e OAB vira a atencao
+    `tarja_que_nao_apaga`; ordem debaixo da tarja continua sinalizada;
+  * carimbo do PJe fora da folha e nota de rodape coberta por figura viram
+    atencao; timbre coberto em toda pagina conta uma vez;
+  * texto sob imagem digitalizada passa pela conferencia de OCR do Tesseract;
+  * link so sinaliza com ordem dirigida a IA, e `utm_source` sai do endereco;
+  * o binario de assinatura ICP-Brasil deixa de ser lido como campo de
+    formulario;
+  * o detector de texto deixa de disparar em "[s]egundo", "burlar a lei",
+    "em atencao ao sistema", linha quebrada no meio da frase, rol de pedidos
+    ("b. conceda a liminar"), "/launchapp" e "TRF/4a";
+  * a quebra manual do Word (U+2028) deixa de contar como caractere
+    invisivel;
+  * texto de imagem embutida (OCR de digitalizacao, marca d'agua, botao de
+    captura de tela) precisa formar frase, e ordem em imagem de contraste
+    baixo precisa ser dirigida a IA;
+  * glifo repetido ("0 0 0") deixa de contar como letras soltas.
 
 ## 0.5.0
 

@@ -50,6 +50,8 @@ dela o conjunto vira desenvolvimento.
 | Documentos reais com imagens lidas pelo OCR (210) | **0** | 0 |
 | Áudio e vídeo públicos reais (25 recortes de 3 minutos) | **0** | 0 |
 | Atacante que conhece o código: tentativas válidas sinalizadas | **21%** | 77%, e 1% sem nenhum aviso |
+| Petições reais de entidades, partidos e imprensa sinalizadas por engano (402) | **59** (14,7%) | 10 (2,5%) |
+| Petições nunca vistas, depois das correções (216) | **9** (4,2%) | não ajustado |
 
 A Justiça brasileira já lê com IA texto e PDF de peças e a transcrição de
 audiências (resumida por modelo em vários tribunais); a imagem entra pelo
@@ -61,8 +63,11 @@ Quatro coisas para ler nessas tabelas:
 * **O ataque real é de forma, e forma se detecta.** Em todos os casos
   brasileiros conhecidos o comando estava invisível. A inspeção de PDF olha cor,
   tamanho e posição do texto, e libera papel timbrado e camada de OCR.
-* **Em documento real quase não incomoda.** Dois sinalizados em 4.007. A versão
-  anterior barrava 43% dos acórdãos inteiros do STJ.
+* **Em documento público quase não incomoda; em petição incomodava.** Dois
+  sinalizados em 4.007 textos e nenhum em 438 documentos públicos. Petições
+  reais deram 59 em 402 na primeira passada: tarja que não apaga o CPF, timbre
+  coberto, linguagem de peça lida como comando. Nenhuma trazia ordem a IA.
+  Corrigido, um lote nunca visto teve 9 sinalizados em 216 (4,2%), sobretudo petições que falam da própria IA.
 * **Quem conhece as regras passa, mas quase nunca em silêncio.** O atacante
   adaptativo escapou da sinalização nos dez comandos reais; depois de três
   rodadas de regras de forma, o que escapa são ordens curtas e secas, e o

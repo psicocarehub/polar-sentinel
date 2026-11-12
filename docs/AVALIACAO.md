@@ -478,7 +478,9 @@ do texto oculto não desfazia leetspeak, e o texto, por ter dígitos, não
   gera atenção, e sinaliza se traz ordem ou forma frase;
 * texto oculto com quinze letras soltas em sequência ou três palavras com as
   letras ligadas por hífen sinaliza, inclusive em baixo contraste. Nenhum dos
-  mais de 2.400 documentos reais medidos tem isso.
+  mais de 2.400 documentos reais medidos até então tinha isso; as petições da
+  seção 10 tiveram três casos de glifo repetido ("0 0 0", "à à à"), e a regra
+  passou a exigir sete letras diferentes.
 
 Na mesma revisão apareceu um erro da fase de imagem: a regra das seis
 palavras, pensada para texto lido de imagem embutida, valia para texto de PDF
@@ -504,6 +506,102 @@ se obedece; o espaço de técnicas é o que este autor pensou, e outro atacante
 pensaria outras; as regras foram ajustadas olhando para as rodadas, então a
 rodada 4 é desenvolvimento, e a próxima medida honesta é um atacante novo
 contra a versão congelada.
+
+Depois das correções da seção 10, a rodada repetida com o mesmo orçamento deu
+o mesmo resultado (1.153 de 1.500 sinalizadas), e os conjuntos cegos de
+documentos e de imagens também (39 de 40 e 22 de 35, com 1 de 27 legítimos).
+
+## 10. Petições reais (versão 0.6.0)
+
+Os documentos reais das seções anteriores são pareceres, atas e licenças. Faltava
+o que um tribunal mais recebe: petição de advogado. O DataJud, a API pública do
+CNJ, só dá metadados (classe, assunto, movimentos), sem o conteúdo das peças.
+As petições vieram de quem as publica em arquivo original: entidades da
+sociedade civil (Conectas, APIB, IBCCRIM, Observatório do Clima, IRIB),
+partidos (PT, PSOL, PDT, PCdoB) e imprensa jurídica e política (Migalhas,
+Poder360, Congresso em Foco, ((o))eco), só arquivos linkados em página
+publicada ou em índice público, com o `robots.txt` respeitado. Dos 410 arquivos
+do lote 1, 126 têm assinatura digital; 402 (10.732 páginas) foram lidos; ficaram de fora 5
+em .doc antigo, que o Sentinel não lê, e 3 acima de 30 MB. A amostra
+não é a de um cartório: pesa para o STF, para ações eleitorais de 2026 e para
+casos políticos, tem muito documento de entidade e quase nenhuma contestação
+cível comum. A lista e o método estão em `LEIA-ME.md` da coleta, que não é
+publicada.
+
+### Primeira passada
+
+A versão 0.6.0 congelada, antes de olhar para as petições, sinalizou **59 de
+402 (14,7%; intervalo de 95%: 11,6% a 18,5%)** e deu atenção a mais 45. É o
+número honesto, e é muito pior que os 0 de 438 da amostra de documentos
+públicos. A versão 0.5.0 publicada sinalizava pelo menos 29 delas: metade do
+problema já existia.
+
+| Motivo na primeira passada | Petições |
+| --- | ---: |
+| Comando no texto visível | 18 |
+| Texto invisível que a máquina lê (cor do fundo, coberto, fora da página) | 17 |
+| Ordem em texto lido de imagem | 9 |
+| Texto invisível lido de imagem | 10 |
+| Ordem em endereço de link | 9 |
+| Texto oculto ofuscado | 3 |
+| Ordem em campo de formulário | 2 |
+| Fonte minúscula | 1 |
+
+Uma petição pode ter mais de um motivo. Nenhuma das 59 trazia ordem a IA. As
+causas, olhando arquivo por arquivo:
+
+* **Tarja que não apaga.** Jornal e entidade que publicam a petição cobrem CPF,
+  RG, endereço e OAB com um retângulo preto ou branco, e o texto continua no
+  arquivo. A pessoa não lê, a máquina lê: é exatamente a discrepância que o
+  Sentinel mede, só que não é ataque. Virou o aviso de atenção
+  `tarja_que_nao_apaga` quando o texto escondido é qualificação de parte (CPF,
+  CNPJ, CEP, e-mail, OAB, "brasileiro, casado, residente"); ordem debaixo da
+  tarja continua sinalizada. O aviso serve também a quem publica: a
+  anonimização falhou.
+* **Timbre e carimbo.** O nome do partido no timbre, coberto pelo corpo do
+  texto em todas as páginas e cortado em lugares diferentes ("UTIVA NA",
+  "EXECUTIVA NACIONAL"), somava frase; agora cada texto conta uma vez, sem os
+  pedaços de outro. O carimbo de assinatura do PJe fora da folha e a nota de
+  rodapé coberta por um gráfico mal posicionado viraram atenção.
+* **Camada de OCR debaixo da imagem.** Petição digitalizada com o texto do OCR
+  posto sob a imagem, sem o modo invisível. Esse texto agora passa pela mesma
+  conferência do Tesseract que a camada de OCR comum: se a imagem mostra o
+  mesmo texto, é visível; se não mostra, continua escondido.
+* **Endereço e assinatura lidos como texto.** "informe" e "destaque" dentro de
+  uma URL eram lidos como ordem (link agora exige ordem dirigida à IA, como o
+  metadado), "?utm_source=chatgpt.com" trazia o nome de uma IA, e o binário da
+  assinatura ICP-Brasil era lido como valor de campo de formulário.
+* **Linguagem de peça.** O detector de texto visível disparava em "[s]egundo"
+  (citação com a inicial alterada, lida como delimitador `[s]`), em "burlar a
+  lei", em "em atenção ao sistema socioeducativo", em linha quebrada no meio da
+  frase ("pretende que se / reconheça a inadmissibilidade") e no rol de
+  pedidos ("b. conceda o pedido de liminar"), lidos como ordem de julgamento,
+  e em "/launchapp" de um endereço e "TRF/4a" lidos como PDF ativo. A quebra de
+  linha manual do Word (U+2028) contava como caractere invisível: 760 numa só
+  petição.
+* **Imagem dentro da petição.** Ruído do OCR em página fotografada, marca
+  d'água e botão cinza de captura de tela ("Ver resumo") viravam ordem ou
+  texto invisível. Texto invisível de imagem agora precisa formar frase com
+  pouco lixo, e ordem em imagem de contraste baixo, mas visível, precisa ser
+  dirigida à IA.
+* **Glifo repetido.** "0 0 0" e "à à à" contavam como letras soltas de texto
+  ofuscado.
+
+Cada correção tem teste em `tests/test_peticoes_reais.py`, com o padrão real e
+o ataque vizinho que continua sinalizado. Depois delas, o lote 1 ficou com
+**10 de 402 (2,5%)**, mas esse número é de desenvolvimento: as regras foram
+corrigidas olhando para ele. Os dez que sobram são digitalizações ruins e
+capturas de tela em que o contraste medido na imagem erra, e texto de jornal
+colado sobre o corpo da petição.
+
+### Lote 2, nunca visto
+
+As 217 petições que sobraram da mesma coleta, separadas antes de qualquer
+leitura para equilibrar as fontes, foram baixadas depois de congeladas as
+correções (commit `ad8c08a`) e lidas uma vez: **9 de 216 sinalizadas (4,2%; intervalo de 95%: 2,2% a 7,7%)**, com atenção em mais 27
+(5.445 páginas; uma não abriu, PDF corrompido).
+
+Nenhuma das nove trazia ordem a IA. As causas: duas petições sobre conteúdo gerado por IA nas eleições de 2026, em que o detector de texto leu "inteligência artificial" no começo de uma linha quebrada como vocativo; um pedido de moderação de anúncios "sem revisão humana"; um bloco hexadecimal; o cabeçalho do PJe gravado no metadado; e quatro textos lidos de imagem ou postos sob figura (memes e capturas de tela de sistemas do governo). O número é maior que os 2,5% do lote 1 depois das correções, como se espera de um número que não serviu ao ajuste. A falha mais clara, o vocativo em linha quebrada, é a mesma que foi corrigida no rol de pedidos e ainda vale nos outros padrões do detector; corrigi-la agora faria deste lote também desenvolvimento. A próxima medida honesta pede um lote 3 de outras fontes, como escritórios e processos de primeiro grau, lido uma vez.
 
 ## O que mudou entre a versão 0.3.0 e a 0.4.0
 
