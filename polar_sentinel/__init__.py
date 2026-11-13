@@ -21,7 +21,7 @@ Alinhado a Resolucao CNJ 615/2025 e a Manifestacao Tecnica CNIAJ 1/2026.
 
 from __future__ import annotations
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 from polar_sentinel.reference.sanitizer import (
     sanitize_ingested_text,

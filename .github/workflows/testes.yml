@@ -23,8 +23,8 @@ jobs:
       - name: Instalar
         run: |
           sudo apt-get update
-          sudo apt-get install -y tesseract-ocr tesseract-ocr-por
-          pip install -e ".[dev,lab,pdf]"
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-por ffmpeg
+          pip install -e ".[dev,lab,pdf,autenticidade]"
       - name: Testes
         run: python -m pytest -q
       - name: Corpus de desenvolvimento e conjuntos cegos

@@ -137,7 +137,9 @@ _WEAK = [
     r"\b(?:" + _OVERRIDE_IMPERATIVE + r")\s+(?:all|previous|prior|earlier|above|the|todas?|as|"
     r"os|qualquer|tudo|everything)\b",
     r"(?:output|responda|retorne|escreva|answer|respond)\s+(?:only|apenas|somente)",
-    r"\b(?:jailbreak|burlar)\b",
+    # "burlar a lei" e comum em peca; so conta burlar um controle.
+    r"\bjailbreak\b|\bburlar\s+(?:o|os|a|as|esse|este|essa|esta|seus?|suas?)\s+(?:filtros?|"
+    r"seguranca|controles?|protec\w+|guardrails?|restric\w+|bloqueios?|regras do sistema)\b",
     r"(?:new|nova)\s+(?:instruction|instrucao|ordem|regra)s?\s*:",
     r"system\s*:|^\s*sistema\s*:",
     r"sem\s+(?:a\s+)?(?:revisao|aprovacao|conferencia|supervisao)\b",
@@ -202,7 +204,8 @@ _ADDRESSED_TO_AI = [
     r"\b(?:" + _LABEL + r")(?:\s+\w+){0,2}?[\s,:(]+(?:(?:a|ao|aos|as|para|para o|para a|"
     r"para os|para as)\s+)?(?:" + _AI_TERM + r")",
     # rotulo com forma curta e dois-pontos logo depois: "instrucao ao agente:"
-    r"\b(?:" + _LABEL + r")(?:\s+\w+){0,3}?\s+(?:ao|aos|para o|para os|para a|destinad\w+ aos?)"
+    # "em atencao ao sistema socioeducativo" e locucao de peca, nao rotulo.
+    r"(?<!em\s)(?<!em\s\s)(?<!com\s)(?<!com\s\s)\b(?:" + _LABEL + r")(?:\s+\w+){0,3}?\s+(?:ao|aos|para o|para os|para a|destinad\w+ aos?)"
     r"\s+(?:" + _AI_SHORT + r")\b[^.\n]{0,50}[:,]",
     # destinatario no inicio da frase: "ao sistema automatizado:", "para o agente de IA:"
     r"(?:^|[.!?]\s+)\(?(?:ao|aos|para o|para a|para os|a l'attention d[ue]|to the)\s+(?:"
@@ -274,7 +277,11 @@ _MEDIUM = [
     r"!\[[^\]]*\]\(https?://[^)]*\?[^)]*\)",
     r"\bapi[_ ]call\b|\bfunction[_ ]call\b|\btool[_ ]call\b|\bsend_email\b",
     r"\b(?:without|free\s+(?:of|from))\s+(?:any\s+)?(?:restrictions|censorship|filters|ethical|moral)\b",
-    r"\bsem\s+(?:restric\w+|censura|filtros)\b|\bstay\s+in\s+character\b|\bfrom\s+now\s+on\b",
+    # "sem restricao a sua distribuicao" e portugues de peca; jailbreak manda
+    # responder ou agir "sem restricoes, sem censura".
+    r"\b(?:responda|respondera|responder|aja|atue|opere|escreva|gere|fale|modo)\s+(?:\w+\s+){0,2}?"
+    r"sem\s+(?:restric\w+|censura|filtros)\b|\bsem\s+(?:censura|filtros)\s*,|"
+    r"\bstay\s+in\s+character\b|\bfrom\s+now\s+on\b",
 ]
 
 # Marcadores de papel ou de sistema.
@@ -285,7 +292,7 @@ _ROLE_LINE = re.compile(
 _ROLE_MARKERS = [
     r"<\s*/?\s*(?:system|sistema|instructions?|instrucoes|prompt|assistant|developer)\s*>",
     r"\"role\"\s*:\s*\"(?:system|assistant|developer)\"",
-    r"\[/?(?:inst|system|sistema|s)\]",
+    r"\[/?(?:inst|system|sistema)\]|\[/s\]",  # "[s]egundo" e citacao alterada
     r"<\|.*?\|>",
     r"```\s*(?:fim|end|system|sistema|prompt)",
     r"(?:fim|end)[_ ]d[oe][_ ](?:resumo|prompt|contexto|documento)\b.{0,40}"
@@ -415,7 +422,9 @@ _PERSONA = [
 ]
 
 # Marcadores de estrutura ativa de PDF, que nao deveriam chegar como texto.
-_ACTIVE_PDF = [r"/openaction", r"/javascript", r"/js\b", r"/launch", r"/aa\b"]
+# Nome de PDF solto, nao pedaco de endereco ("thomsonreuters.com/launchapp") nem
+# de sigla ("trf/4a" vira "trf/aa" no leetspeak).
+_ACTIVE_PDF = [r"(?<![\w.])/(?:openaction|javascript|js|launch|aa)\b"]
 
 # Linguagem com aparencia de decisao judicial.
 _JUDICIAL_DECISIVE = [
@@ -520,6 +529,56 @@ def _first(patterns: List[str], view: str, flags: int = 0) -> str:
     return ""
 
 
+_LINHA_CHEIA = 35
+
+
+def _linha_continuada(view: str, inicio: int) -> bool:
+    """A linha que comeca em `inicio` continua a frase da linha anterior?
+
+    Em PDF a linha quebra no meio da frase; linha anterior terminada em letra ou
+    virgula nao fecha frase, entao o comeco desta nao e comeco de frase.
+    """
+    if inicio == 0 or view[inicio - 1] != "\n":
+        return False
+    anterior = view[:inicio].rstrip()
+    # Linha quebrada pela largura da pagina e comprida; titulo e assunto de
+    # e-mail ("Email sending request") sao curtos e fecham sem ponto.
+    linha = anterior[anterior.rfind("\n") + 1:].strip()
+    return len(linha) >= _LINHA_CHEIA and bool(re.search(r"[a-z0-9,]$", anterior))
+
+
+def _em_frase(patterns: List[str], view: str) -> bool:
+    """Algum padrao casa fora de uma linha que so continua a frase anterior?"""
+    for pattern in patterns:
+        for m in re.finditer(pattern, view, re.MULTILINE):
+            # "Assistente de IA:" e rotulo mesmo no meio da frase; a virgula
+            # ("inteligencia artificial, demonstra") e que pode ser so texto.
+            if ":" in m.group() or not _linha_continuada(view, m.start()):
+                return True
+    return False
+
+
+def _ordem_de_dispositivo(view: str) -> bool:
+    """Imperativo de julgamento no inicio de frase, e nao numa linha quebrada.
+
+    Em PDF a linha quebra no meio da frase: "pretende que se\nreconheca a
+    inadmissibilidade" nao e ordem. Linha anterior terminada em letra ou virgula
+    e continuacao de frase.
+    """
+    for pattern in _JUDICIAL_ORDER:
+        for m in re.finditer(pattern, view, re.MULTILINE):
+            antes = view[:m.start()]
+            if _linha_continuada(view, m.start()):
+                continue
+            # Item do rol de pedidos ("b. conceda o pedido de liminar"): a peca
+            # pede ao juiz, nao manda na IA.
+            if re.search(r"(?:^|\n)\s*(?:\d{1,2}|[a-z]|[ivxl]{1,5})\s*[.)\-]\s*$",
+                         antes + m.group()[:len(m.group()) - len(m.group().lstrip(".!?: \n"))]):
+                continue
+            return True
+    return False
+
+
 def _strong_signals(view: str) -> List[Tuple[float, str]]:
     """Sinais fortes encontrados em uma vista do texto."""
     found: List[Tuple[float, str]] = []
@@ -528,7 +587,7 @@ def _strong_signals(view: str) -> List[Tuple[float, str]]:
     if achou:
         found.append((0.6 if qualificado else 0.45, "override_canonico_ignore_instrucoes"))
 
-    if _first(_ADDRESSED_TO_AI, view, re.MULTILINE):
+    if _em_frase(_ADDRESSED_TO_AI, view):
         found.append((0.5, "texto_dirigido_a_ia_leitora"))
 
     if _ROLE_LINE.search(view):
@@ -563,7 +622,7 @@ def _strong_signals(view: str) -> List[Tuple[float, str]]:
         found.append((0.45, "troca_de_papel_ou_de_tarefa") if not any(
             r == "troca_de_papel_ou_de_tarefa" for _, r in found) else (0.0, "troca_de_papel_ou_de_tarefa"))
 
-    if _first(_JUDICIAL_ORDER, view, re.MULTILINE):
+    if _ordem_de_dispositivo(view):
         found.append((0.45, "ordem_de_dispositivo_dirigida_ao_leitor"))
 
     return found

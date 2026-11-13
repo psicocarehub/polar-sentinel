@@ -1,9 +1,9 @@
 cff-version: 1.2.0
 message: "Se usar este software ou os conjuntos de teste, cite como abaixo."
-title: "Polar Sentinel: o que um filtro determinístico de injeção de comandos pega, e o que deixa passar, em documentos jurídicos brasileiros"
+title: "Polar Sentinel: o que a pessoa vê e ouve contra o que a máquina lê, em documentos, imagens, vídeos e áudios lidos pela Justiça brasileira"
 type: software
-version: 0.5.0
-date-released: 2026-11-11
+version: 0.6.0
+date-released: 2026-11-13
 license: Apache-2.0
 repository-code: "https://github.com/psicocarehub/polar-sentinel"
 doi: "10.5281/zenodo.24143886"

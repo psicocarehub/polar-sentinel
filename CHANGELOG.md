@@ -2,6 +2,94 @@
 
 Formato baseado em Keep a Changelog. Versionamento semantico.
 
+## 0.6.0 (13/11/2026)
+
+Imagem, video, audio e autenticidade; atacante adaptativo e peticoes reais.
+
+### Adicionado
+
+* Imagem (`reference/imagem_inspector.py`): o Tesseract le a imagem como esta e
+  numa vista amplificada, em que o que difere um pouco do papel em volta (mais
+  claro ou mais escuro, em qualquer canal de cor) vira preto. Cada linha ganha
+  contraste e tamanho medidos na imagem original. Acha letra quase da cor do
+  papel ou do fundo escuro, amarelo claro sobre branco, texto nos pixels
+  transparentes, texto que so aparece quando a imagem e reduzida sem
+  suavizacao para tamanhos de entrada de modelo (ataque de escala, com um
+  sinal barato que escolhe quais reducoes ler) e ordem em EXIF, XMP, PNG e
+  comentario de JPEG.
+* PDF digitalizado sem camada de texto passa a ser lido; imagens de pagina sao
+  lidas na resolucao da imagem; metadados de JPEG embutido em PDF; imagens de
+  `.docx`.
+* Video (`reference/video_inspector.py`, ffmpeg): metadados e capitulos do
+  conteiner, faixas de legenda lidas inteiras, legenda que fica menos de 0,3 s
+  na tela, quadro relampago entre dois cortes (menos de 0,25 s) lido com o
+  inspetor de imagem, quadros amostrados com texto apagado, faixas extras.
+* Audio (`reference/audio_inspector.py`, faster-whisper e Vosk): fala 20 dB ou
+  mais abaixo da fala principal sai do texto "ouvido" e e relatada; versoes
+  com volume normalizado, faixa de voz isolada e audio desacelerado revelam
+  fala escondida; dois transcritores de familias diferentes comparados;
+  trecho com voz e sem transcricao; energia acima de 18 kHz.
+* Autenticidade (`reference/autenticidade.py`, `python -m polar_sentinel.laudo`):
+  assinaturas de PDF validadas pelo pyHanko contra as raizes da ICP-Brasil
+  (v5, v10, v11 e v12, no pacote), nivel de modificacao depois de cada
+  assinatura e diferenca visual entre a revisao assinada e a atual, com a
+  regiao; assinatura legada adbe.pkcs7.sha1 com o hash conferido; manifesto
+  C2PA (presenca, validade, assinante, declaracao de geracao por IA). Tres
+  conclusoes: integridade confirmada, alteracao detectada, inconclusivo.
+* A certidao aceita imagem, video e audio, com instantes e duracoes.
+* Atacante adaptativo (`benchmarks/atacante_adaptativo.py`): conhece o codigo,
+  combina dez formas de esconder texto no PDF, nove transformacoes e
+  parafrases, confere com o Poppler que o ataque e extraivel e imperceptivel e
+  aprende com o que escapou. As regras abaixo vieram das rodadas dele.
+* PDF: a busca de ordem no texto oculto desfaz leetspeak e reune letras
+  espacadas; texto invisivel de fato que forma frase (seis palavras e duas de
+  ligacao) sinaliza mesmo sem ordem; texto oculto com letras soltas ou ligadas
+  por hifen sinaliza, inclusive em baixo contraste; texto substituto
+  (`/ActualText`) diferente dos glifos desenhados gera atencao e sinaliza com
+  ordem ou frase.
+* Levantamento do que a Justica brasileira le com IA, por formato
+  (`docs/pesquisa/IA-NA-JUSTICA-POR-FORMATO.md`), resumido no modelo de ameacas.
+* `python -m polar_sentinel.modelos` baixa o Whisper e o Vosk pequeno de
+  portugues. Quando falta Tesseract, faster-whisper ou o modelo do Vosk, a
+  leitura registra o que ficou de fora e a certidao mostra ("Leitura feita
+  sem: ...").
+
+### Corrigido
+
+* A regra das seis palavras, feita para texto lido de imagem embutida, valia
+  para texto de PDF na cor do fundo e nao valia para a imagem embutida.
+* O faster-whisper 1.2 deixou de decodificar audio com o PyAV 19; o sinal
+  agora chega ja decodificado.
+* O extra `midia` pedia `vosk>=0.3.45`, versao que nao existe.
+* A certidao dizia "ordem em conteudo que o leitor nao ve" tambem quando a
+  ordem estava no texto visivel ou na fala audivel.
+* Falsos positivos achados em 402 peticoes reais (59 na primeira passada, 29
+  delas ja na 0.5.0), cada um com teste em `tests/test_peticoes_reais.py`:
+  * tarja preta ou branca sobre CPF, endereco e OAB vira a atencao
+    `tarja_que_nao_apaga`; ordem debaixo da tarja continua sinalizada;
+  * carimbo do PJe fora da folha e nota de rodape coberta por figura viram
+    atencao; timbre coberto em toda pagina conta uma vez;
+  * texto sob imagem digitalizada passa pela conferencia de OCR do Tesseract;
+  * link so sinaliza com ordem dirigida a IA, e `utm_source` sai do endereco;
+  * o binario de assinatura ICP-Brasil deixa de ser lido como campo de
+    formulario;
+  * o detector de texto deixa de disparar em "[s]egundo", "burlar a lei",
+    "em atencao ao sistema", linha quebrada no meio da frase, rol de pedidos
+    ("b. conceda a liminar"), "/launchapp" e "TRF/4a";
+  * a quebra manual do Word (U+2028) deixa de contar como caractere
+    invisivel;
+  * texto de imagem embutida (OCR de digitalizacao, marca d'agua, botao de
+    captura de tela) precisa formar frase, e ordem em imagem de contraste
+    baixo precisa ser dirigida a IA;
+  * glifo repetido ("0 0 0") deixa de contar como letras soltas.
+* Falsos positivos de um segundo lote de 216 peticoes (9 sinalizadas):
+  * vocativo de IA em linha quebrada nao conta, salvo rotulo com dois-pontos;
+  * cada fonte de video fecha com ponto antes do detector;
+  * "sem restricao" so conta depois de verbo de resposta;
+  * metadado e link pedem ordem alem do termo de IA;
+  * numero de pagina coberto conta uma vez.
+  Um terceiro lote, de outras fontes, lido uma vez depois disso: 10 de 193.
+
 ## 0.5.0
 
 Documento completo: o que a pessoa ve contra o que a maquina le.

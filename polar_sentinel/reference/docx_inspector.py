@@ -250,6 +250,32 @@ def _metadados(arquivo: zipfile.ZipFile) -> List[Achado]:
     return achados
 
 
+_EXTENSOES_IMAGEM = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp")
+
+
+def _ler_imagens(
+    arquivo: zipfile.ZipFile, visivel: List[str], ocultos: List[TrechoDocx], achados: List[Achado]
+) -> None:
+    """Le as imagens do documento com o inspetor de imagem, quando o Tesseract existe."""
+    from polar_sentinel.reference.imagem_inspector import disponivel, inspecionar_imagem
+
+    if not disponivel():
+        return
+    for nome in arquivo.namelist():
+        if not (nome.startswith("word/media/") and nome.lower().endswith(_EXTENSOES_IMAGEM)):
+            continue
+        try:
+            inspecao = inspecionar_imagem(arquivo.read(nome))
+        except Exception:  # noqa: BLE001 - imagem corrompida nao derruba a inspecao
+            continue
+        if inspecao.visible_text.strip():
+            visivel.append("\n" + inspecao.visible_text + "\n")
+        for t in inspecao.hidden_spans:
+            ocultos.append(TrechoDocx(nome, t.texto, "imagem_" + t.motivo, t.medidas))
+        for a in inspecao.achados:
+            achados.append(Achado(a.tipo, a.texto, None, {**a.detalhe, "parte": nome}))
+
+
 def inspect_docx(source: Union[str, Path, bytes, Any]) -> DocxInspection:
     """Le um .docx e separa o que o Word mostra do que esta so no arquivo."""
     if isinstance(source, (str, Path)):
@@ -309,6 +335,7 @@ def inspect_docx(source: Union[str, Path, bytes, Any]) -> DocxInspection:
         elif nome.endswith("vbaProject.bin"):
             achados.append(Achado("macro", "", None, {"parte": nome}))
     achados.extend(_metadados(arquivo))
+    _ler_imagens(arquivo, visivel, ocultos, achados)
 
     for trecho in ocultos:
         trecho.texto = " ".join(trecho.texto.split())
@@ -339,6 +366,7 @@ def evaluate_docx(source: Union[str, Path, bytes, Any], stage: str = "entrada") 
     from polar_sentinel.harness.orchestration import create_judicial_orchestrator
     from polar_sentinel.reference.pdf_inspector import (
         _MIN_LETTERS,
+        _invisivel_em_imagem,
         dirigido_a_ia,
         parece_texto,
         tem_ordem,
@@ -365,7 +393,14 @@ def evaluate_docx(source: Union[str, Path, bytes, Any], stage: str = "entrada") 
             reasons.append("texto_em_fonte_minuscula")
         elif tem_ordem(texto, stage):
             reasons.append(f"ordem_em_texto_oculto ({motivo})")
-        elif letras >= _MIN_LETTERS and motivo != "texto_excluido":
+        elif _invisivel_em_imagem(motivo, texto):
+            reasons.append(f"texto_invisivel_legivel_por_maquina ({motivo})")
+        elif (
+            letras >= _MIN_LETTERS
+            and parece_texto(texto)
+            and motivo != "texto_excluido"
+            and not motivo.endswith("baixo_contraste")
+        ):
             atencao.append(f"texto_oculto_sem_ordem ({motivo})")
 
     for achado in inspection.achados:

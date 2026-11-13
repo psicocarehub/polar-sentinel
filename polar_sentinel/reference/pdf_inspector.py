@@ -43,6 +43,9 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from polar_sentinel.reference.injection_detector import (
     _AI_TERM,
     _IMPERATIVE,
+    _collapse,
+    _join_spaced,
+    _undo_leet,
     detect_suspicious_patterns,
     fold,
 )
@@ -60,13 +63,29 @@ _SAME_COLOR = 0.1
 _MIN_READABLE_PT = 2.0
 # Letras a partir das quais um trecho em fonte minuscula deixa de ser residuo.
 _MIN_LETTERS = 12
-
+# Formas em que a pessoa nao ve o texto de jeito nenhum (o baixo contraste ainda
+# se le de perto; a camada de OCR nao confirmada pode ser so erro de leitura).
+INVISIVEL_DE_FATO = frozenset(
+    {"cor_do_fundo", "coberto_ou_recortado", "transparente", "modo_invisivel", "fora_da_pagina"}
+)
+# Texto invisivel de fato que forma frase sinaliza mesmo sem ordem reconhecida.
+# O atacante adaptativo escapava da regra de ordem trocando letras por digitos
+# ("d3f1r4"); uma contagem de caracteres pegava, mas tambem pegava referencia
+# interna de escritorio em branco ("REF-INT: PASTA 2026-0412 | CLIENTE ..."),
+# que e pratica real. Frase (palavras de ligacao) separa as duas coisas.
 _FILL_OPS = {b"f", b"F", b"f*", b"B", b"B*", b"b", b"b*"}
 _NO_FILL_OPS = {b"n", b"S", b"s"}
 
 _ORDER_RE = re.compile(
     r"\b(?:" + _IMPERATIVE + r")\b|\b(?:" + _AI_TERM + r")|\b(?:chat|gpt|chatgpt|inteligencia artificial)\b"
 )
+_IMPERATIVO_RE = re.compile(r"\b(?:" + _IMPERATIVE + r")\b")
+# "Diretriz para sistemas de IA:", "nota ao modelo:": rotulo dirigido a IA.
+_ROTULO_A_IA = re.compile(r"(?:" + _AI_TERM + r"|\bia\b|\bmodelos?\b|\bassistentes?\b)[^.\n:()\[\]|]{0,20}:")
+# Ordem na voz passiva: "deve ser resumida como", "devem ser tratados como".
+_DEVER_DE_LEITURA = re.compile(
+    r"\bdevem?\s+ser\s+(?:resumid|apontad|considerad|tratad|classificad|descrit|lid|"
+    r"interpretad|apresentad|avaliad|ignorad|desconsiderad)\w*")
 # Os mesmos sinais com as palavras partidas ("pet ição", "in teligência"): o
 # texto oculto e comparado tambem sem espacos nem pontuacao. Radicais curtos
 # ("gpt", "llm") ficam de fora, porque aparecem por acaso em blocos de base64.
@@ -78,10 +97,22 @@ _RADICAIS = re.compile(
     "negue|interprete|favoravel|integralmenteprovido|conhecidoeprovido|sevoceeum|"
     "conceda|classifique|sugira|declare|registre"
 )
-# Termo de IA, para os canais em que imperativo sozinho e comum (metadados).
+# Termo de IA ou sinal de leitura por maquina, para os canais em que
+# imperativo sozinho e comum (metadados): "ao transcrever", "instrucoes
+# anteriores", "sem avisar".
 _TERMO_DE_IA = re.compile(
     r"\b(?:" + _AI_TERM + r")|\b(?:chat|gpt|chatgpt|llm|ia|leitor(?:es)? automatizad\w*|"
-    r"sistemas? automatizad\w*)\b"
+    r"sistemas? automatizad\w*|(?:ao|para o|aos) modelos?|"
+    r"ao (?:transcrever|analisar|resumir|ler|processar|interpretar|descrever)|"
+    r"(?:orientacoes|instrucoes|comandos|regras) anteriores|sem (?:avisar|informar|mencionar))\b"
+    # vocativo curto seguido de dois-pontos: "Assistente: nao transcreva..."
+    r"|\b(?:assistente|modelo|sistema|agente|ia|leitor\w*|transcritor)\s*:"
+)
+# Ordens de adulteracao que nao estao no detector de texto, que trabalha sobre
+# texto visivel e evita verbos comuns em peca. Aqui so valem em canal oculto.
+_ORDEM_DE_ADULTERACAO = re.compile(
+    r"\b(?:substitua|troque|altere|elogie|rejeite|esqueca|apague|acrescente|modifique|"
+    r"mude|inverta|minimize|exagere|enfatize)\b"
 )
 # Bloco sem espaco maior que isto nao e palavra partida (base64, hash).
 _MAX_PEDACO = 20
@@ -94,6 +125,8 @@ _CANAIS_COM_TEXTO = {
     "javascript": "ordem_em_javascript",
     "link": "ordem_em_link",
     "metadado": "comando_em_metadado",
+    "metadado_de_imagem": "comando_em_metadado_de_imagem",
+    "texto_substituto": "ordem_em_texto_substituto",
 }
 
 
@@ -232,15 +265,164 @@ def tem_ordem(texto: str, stage: str = "entrada") -> bool:
     texto = sanitize_with_audit(texto).text  # tira largura zero entre as letras
     dobrado = fold(texto)
     pedacos = " ".join(p for p in dobrado.split() if len(p) <= _MAX_PEDACO)
-    if _ORDER_RE.search(dobrado) or _RADICAIS.search(re.sub(r"[^a-z]", "", pedacos)):
+    if _RADICAIS.search(re.sub(r"[^a-z]", "", pedacos)):
         return True
+    cru = fold(texto, collapse=False)
+    for vista in (dobrado, _undo_leet(dobrado), _undo_leet(_collapse(_join_spaced(cru)))):
+        if _ORDER_RE.search(vista) or _ORDEM_DE_ADULTERACAO.search(vista):
+            return True
     return detect_suspicious_patterns(texto, stage)[0] > 0.2
+
+
+def _invisivel_em_imagem(motivo: str, texto: str) -> bool:
+    """Texto de imagem que a pessoa nao ve e que tem palavras de verdade bastantes."""
+    from polar_sentinel.reference.imagem_inspector import (
+        INVISIVEL_EM_IMAGEM,
+        MIN_PALAVRAS_INVISIVEIS,
+        _palavras_reais,
+    )
+
+    # So vale para trecho lido de imagem embutida ("imagem_cor_do_fundo"); texto de
+    # PDF na cor do fundo segue a regra de frase, que libera referencia interna.
+    if not motivo.startswith("imagem_"):
+        return False
+    # Digitalizacao e foto dao ruido de OCR ("Lulu que OO. doa") e marca d'agua
+    # ("OBSERVATORIO DO CARVAO"); frase escondida tem palavras de ligacao e pouco lixo.
+    tokens = texto.split()
+    return (motivo[len("imagem_"):] in INVISIVEL_EM_IMAGEM
+            and _palavras_reais(texto) >= MIN_PALAVRAS_INVISIVEIS
+            and parece_frase(texto)
+            and _palavras_reais(texto) >= 0.6 * len(tokens))
 
 
 def dirigido_a_ia(texto: str, stage: str = "entrada") -> bool:
     """Ordem com destinatario de IA explicito, para canais onde imperativo e comum."""
     texto = sanitize_with_audit(texto).text
-    return bool(_TERMO_DE_IA.search(fold(texto))) and tem_ordem(texto, stage)
+    dobrado = fold(texto)
+    if not _TERMO_DE_IA.search(dobrado):
+        return False
+    # O termo de IA sozinho nao e ordem: o assunto do processo no PJe pode ser
+    # "uso de inteligencia artificial". Precisa de um imperativo alem dele.
+    cru = fold(texto, collapse=False)
+    for vista in (dobrado, _undo_leet(dobrado), _undo_leet(_collapse(_join_spaced(cru)))):
+        if (_IMPERATIVO_RE.search(vista) or _ORDEM_DE_ADULTERACAO.search(vista)
+                or _ROTULO_A_IA.search(vista) or _DEVER_DE_LEITURA.search(vista)):
+            return True
+    return detect_suspicious_patterns(texto, stage)[0] > 0.2
+
+
+def desofuscado(texto: str) -> str:
+    """Reune letras espacadas ou ligadas por hifen e desfaz leetspeak, para medir o texto."""
+    cru = fold(sanitize_with_audit(texto).text, collapse=False)
+    cru = re.sub(r"(?<![a-z0-9])(?:[a-z0-9]-)+[a-z0-9](?![a-z0-9])",
+                 lambda m: m.group().replace("-", ""), cru)
+    claro = _undo_leet(_collapse(_join_spaced(cru)))
+    palavras = re.findall(r"[a-z0-9@$]+", claro)
+    if palavras and sum(1 for p in palavras if re.search(r"[0-9@$]", p)) >= 0.3 * len(palavras):
+        # Texto quase todo em leetspeak: os digitos soltos ("3", "4") tambem sao letras.
+        claro = claro.translate(_LEET_TOTAL)
+    return claro
+
+
+_LEET_TOTAL = str.maketrans("013457@$", "oieastas")
+# Palavras de ligacao: frase tem, rotulo e referencia interna nao.
+_LIGACAO = frozenset(
+    "a o as os e de da do das dos em no na nos nas um uma que para por pelo pela com "
+    "se ao aos nao sem como mais ou "
+    # ingles: ataque publicado costuma vir em ingles
+    "the of and to in for on with that is by as an".split()
+)
+
+
+# Letras soltas em sequencia ("d e f i r a") ou ligadas por hifen ("d-e-f-i-r-a"):
+# ofuscacao deliberada. Nenhum dos mais de 2.400 documentos reais medidos tem
+# isso em texto oculto, nem no de baixo contraste.
+_MIN_LETRAS_SOLTAS = 15
+_MIN_LETRAS_DISTINTAS = 7
+_HIFENIZADA = re.compile(r"(?:[^\W\d_]-){4,}[^\W\d_]")
+
+
+def ofuscado(texto: str) -> bool:
+    """Texto escrito para nao ser reconhecido por filtro, mas lido por modelo."""
+    seguidas: List[str] = []
+    maior = 0
+    for parte in texto.split():
+        if re.fullmatch(r"[^\W_]", parte):
+            seguidas.append(parte.lower())
+            # Glifo solto repetido ("0 0 0", "a a a", caixa de formulario) nao e
+            # palavra partida; frase espacada usa letras variadas.
+            if sum(ch.isalpha() for ch in seguidas) >= _MIN_LETRAS_SOLTAS and len(
+                    {ch for ch in seguidas if ch.isalpha()}) >= _MIN_LETRAS_DISTINTAS:
+                maior = len(seguidas)
+        elif not re.fullmatch(r"\W+", parte):
+            seguidas = []
+    return maior >= _MIN_LETRAS_SOLTAS or len(_HIFENIZADA.findall(texto)) >= 3
+
+
+_IDENTIFICADOR = re.compile(
+    r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b"          # CPF
+    r"|\b\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}\b"  # CNPJ
+    r"|\b\d{2}\.?\d{3}-\d{3}\b"                    # CEP
+    r"|\boab\s*/?\s*[a-z]{2}\b"
+    r"|[\w.+-]+@[\w-]+\.[\w.]+"                      # e-mail
+)
+_QUALIFICACAO = re.compile(
+    r"\b(?:brasileir[oa]s?|casad[oa]|solteir[oa]|divorciad[oa]|viuv[oa]|portador[a]?|"
+    r"inscrit[oa]|residente|domiciliad[oa]|endereco|cpf|cnpj|rg|cep|oab|ssp|"
+    r"rua|avenida|av|bairro|apto|apartamento|quadra|lote|s/n|e-?mail|eletronico|advogad[oa])\b"
+)
+
+
+_CARIMBO = re.compile(
+    r"\b(?:assinado (?:eletronicamente|digitalmente)|documento assinado|impresso por|"
+    r"consultadocumento|conferencia de documento digital|codigo verificador)\b"
+)
+
+
+# Assinatura do programa que gerou o PDF, posta em letra minuscula no rodape.
+_GERADOR = re.compile(r"\b(?:powered by|generated by|created (?:with|by)|gerado (?:por|com))\b")
+_REFERENCIA = re.compile(
+    r"\b(?:disponivel em|acesso em|acessado em|consultado em)\b|https?://|www\.")
+
+
+def _sem_repeticao(partes: List[str]) -> List[str]:
+    """Cada texto uma vez, sem os pedacos de outro ("UTIVA NA" de "EXECUTIVA NACIONAL").
+
+    Timbre coberto pelo corpo do texto aparece em toda pagina, cortado em lugares
+    diferentes; somado, viraria frase. Ordem repetida em toda pagina continua
+    contando uma vez.
+    """
+    # Numero nao distingue: "Pag. 1 de 9" e "Pag. 2 de 9" sao o mesmo rodape.
+    limpos = {t: re.sub(r"\s+", " ", re.sub(r"\d+", "#", fold(t))).strip() for t in partes}
+    unicos = sorted({v for v in limpos.values() if v}, key=len, reverse=True)
+    mantidos: List[str] = []
+    for v in unicos:
+        if not any(v in m for m in mantidos):
+            mantidos.append(v)
+    vistos, saida = set(), []
+    for t in partes:
+        v = limpos[t]
+        if v in mantidos and v not in vistos:
+            vistos.add(v)
+            saida.append(t)
+    return saida
+
+
+def dado_pessoal(texto: str) -> bool:
+    """Trecho que e qualificacao de parte (documento, endereco), o que se tarja."""
+    dobrado = fold(texto, collapse=False)
+    if _IDENTIFICADOR.search(dobrado):
+        return True
+    return len(_QUALIFICACAO.findall(dobrado)) >= 2
+
+
+def parece_frase(texto: str) -> bool:
+    """Seis palavras de verdade e duas de ligacao, depois de desfazer a ofuscacao."""
+    from polar_sentinel.reference.imagem_inspector import MIN_PALAVRAS_INVISIVEIS, _palavras_reais
+
+    claro = desofuscado(texto)
+    ligacao = sum(1 for p in re.findall(r"[a-z]+", claro) if p in _LIGACAO)
+    return _palavras_reais(claro) >= MIN_PALAVRAS_INVISIVEIS and ligacao >= 2
 
 
 def parece_texto(texto: str) -> bool:
@@ -249,7 +431,8 @@ def parece_texto(texto: str) -> bool:
     if not visiveis:
         return False
     letras = sum(ch.isalpha() for ch in visiveis)
-    palavras = [p for p in re.findall(r"[^\W\d_]{3,}", texto) if re.search(r"[aeiouáéíóúâêôãõ]", p, re.I)]
+    palavras = [p for p in re.findall(r"[^\W\d_]{3,}", texto)
+                if re.search(r"[aeiouáéíóúâêôãõ]", p, re.I)]
     return letras / len(visiveis) >= 0.6 and len(palavras) >= 2
 
 
@@ -269,10 +452,21 @@ def _pela_renderizacao(dados: bytes) -> Tuple[str, List[HiddenSpan], int]:
     from polar_sentinel.reference.pdf_percepcao import agrupar, perceber_pdf, texto_visivel
 
     paginas = perceber_pdf(dados)
-    visivel = "\n".join(texto_visivel(p) for p in paginas)
-    ocultos = [HiddenSpan(t["pagina"], t["texto"], t["motivo"], t["medidas"])
-               for p in paginas for t in agrupar(p) if t["motivo"] != "camada_ocr"]
-    return visivel, ocultos, len(paginas)
+    textos: List[str] = []
+    ocultos: List[HiddenSpan] = []
+    for p in paginas:
+        texto = texto_visivel(p)
+        ocultos.extend(HiddenSpan(t["pagina"], t["texto"], t["motivo"], t["medidas"])
+                       for t in agrupar(p) if t["motivo"] != "camada_ocr")
+        if p.imagem is not None:
+            # Pagina so de imagem (digitalizado sem camada de texto): o que se le
+            # nela e o texto visivel da pagina.
+            if not texto.strip():
+                texto = p.imagem.visible_text
+            ocultos.extend(HiddenSpan(p.numero, t.texto, "imagem_" + t.motivo, t.medidas)
+                           for t in p.imagem.hidden_spans)
+        textos.append(texto)
+    return "\n".join(textos), ocultos, len(paginas)
 
 
 def _pelo_conteudo(dados: bytes) -> Tuple[str, List[HiddenSpan], int]:
@@ -331,12 +525,50 @@ def evaluate_pdf(source: Union[str, Path, Any], stage: str = "entrada",
     for reason, parts in by_reason.items():
         text = " ".join(p.strip() for p in parts)
         letters = sum(ch.isalpha() for ch in text)
-        if reason == "fonte_minuscula" and letters >= _MIN_LETTERS and parece_texto(text):
+        claro = desofuscado(text)
+        legivel = parece_texto(text) or parece_texto(claro)
+        if (reason == "fonte_minuscula" and sum(ch.isalpha() for ch in claro) >= _MIN_LETTERS
+                and legivel and not _GERADOR.search(fold(text))):
             reasons.append("texto_em_fonte_minuscula")
-        elif tem_ordem(text, stage):
+        elif tem_ordem(text, stage) and (reason != "imagem_baixo_contraste"
+                                          or dirigido_a_ia(text, stage)):
+            # Captura de tela em peca traz botao cinza ("Ver resumo", "Saiba mais"):
+            # em imagem de contraste baixo, mas visivel, so vale ordem dirigida a IA.
             reasons.append(f"ordem_em_texto_oculto ({reason})")
-        elif letters >= _MIN_LETTERS and reason != "baixo_contraste":
+        elif _invisivel_em_imagem(reason, text):
+            reasons.append(f"texto_invisivel_legivel_por_maquina ({reason})")
+        elif (max(letters, sum(ch.isalpha() for ch in claro)) >= _MIN_LETTERS and legivel
+              and not reason.endswith("baixo_contraste")):
             atencao.append(f"texto_oculto_sem_ordem ({reason})")
+
+    # Somado entre as formas: partir o texto entre cor do fundo, transparencia e
+    # recorte nao o deixa abaixo do limite.
+    invisivel_partes = _sem_repeticao([t for r, partes in by_reason.items()
+                                       if r in INVISIVEL_DE_FATO for t in partes])
+    tarjados = [t for t in invisivel_partes if dado_pessoal(t)]
+    if tarjados and not tem_ordem(" ".join(tarjados), stage):
+        # Tarja branca ou preta sobre a qualificacao da parte: a pessoa nao le o
+        # CPF, a maquina le. E falha de anonimizacao, nao ordem a IA.
+        atencao.append("tarja_que_nao_apaga")
+        invisivel_partes = [t for t in invisivel_partes if not dado_pessoal(t)]
+    # Carimbo de assinatura do PJe e do e-SAJ posto na margem ou fora da folha, e
+    # nota de rodape coberta por figura mal posicionada no Word.
+    for padrao, aviso in ((_CARIMBO, "carimbo_de_sistema_fora_da_vista"),
+                          (_REFERENCIA, "referencia_bibliografica_coberta")):
+        achados = [t for t in invisivel_partes if padrao.search(fold(t))]
+        if achados and not tem_ordem(" ".join(achados), stage):
+            atencao.append(aviso)
+            invisivel_partes = [t for t in invisivel_partes if not padrao.search(fold(t))]
+    invisivel = " ".join(invisivel_partes)
+    if (parece_frase(invisivel)
+            and not any(r.startswith(("ordem_em_texto_oculto", "texto_invisivel")) for r in reasons)):
+        formas = ", ".join(sorted(r for r in by_reason if r in INVISIVEL_DE_FATO))
+        reasons.append(f"texto_invisivel_legivel_por_maquina ({formas})")
+
+    oculto = " ".join(t for partes in by_reason.values() for t in partes)
+    if ofuscado(oculto) and not any(r.startswith(("ordem_em_texto_oculto", "texto_invisivel"))
+                                    for r in reasons):
+        reasons.append("texto_oculto_ofuscado")
 
     for achado in inspection.achados:
         if achado.tipo == "arquivo_embutido" and achado.detalhe.get("pdf"):
@@ -345,9 +577,27 @@ def evaluate_pdf(source: Union[str, Path, Any], stage: str = "entrada",
             if interno.flagged:
                 reasons.append("ordem_em_arquivo_embutido")
             continue
+        if achado.tipo == "texto_substituto":
+            # Legitimo quando repete o que a pagina mostra (acessibilidade); o
+            # contrario e a pagina mostrar uma coisa e o extrator entregar outra.
+            glifos = achado.detalhe.pop("glifos", "")
+            achado.detalhe["diverge"] = desofuscado(achado.texto).replace(" ", "") not in (
+                desofuscado(glifos).replace(" ", ""))
+            if not achado.detalhe["diverge"]:
+                continue
+            if not tem_ordem(achado.texto, stage) and parece_frase(achado.texto):
+                reasons.append("texto_invisivel_legivel_por_maquina (texto_substituto)")
+            elif not tem_ordem(achado.texto, stage):
+                atencao.append("texto_substituto_divergente")
+        if achado.tipo == "link":
+            # "?utm_source=chatgpt.com" so diz de onde o advogado copiou o link.
+            achado.texto = re.sub(r"[?&]utm_[a-z]+=[^&#\s]*", "", achado.texto)
         sinal = _CANAIS_COM_TEXTO.get(achado.tipo)
         if sinal and achado.texto and tem_ordem(achado.texto, stage):
-            if achado.tipo != "metadado" or dirigido_a_ia(achado.texto, stage):
+            # Metadado e endereco de link sao cheios de substantivos que tambem sao
+            # imperativos ("informe", "destaque"); ali so vale ordem dirigida a IA.
+            if (not achado.tipo.startswith("metadado") and achado.tipo != "link"
+                    or dirigido_a_ia(achado.texto, stage)):
                 reasons.append(sinal)
         if achado.tipo in ("javascript", "arquivo_embutido", "camada_desligada"):
             atencao.append(achado.tipo)

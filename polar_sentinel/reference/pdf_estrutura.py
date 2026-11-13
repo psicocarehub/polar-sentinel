@@ -93,7 +93,11 @@ def _anotacoes(reader) -> List[Achado]:
                 pai = anot.get("/Parent")
                 if valor is None and pai is not None:
                     valor = pai.get_object().get("/V")
-                partes.append(_texto(valor))
+                valor = valor.get_object() if hasattr(valor, "get_object") else valor
+                # Campo de assinatura guarda um dicionario com o PKCS#7 em binario
+                # (/ByteRange, /Contents), que nao e texto de ninguem.
+                if not hasattr(valor, "keys"):
+                    partes.append(_texto(valor))
                 tipo = "campo_de_formulario"
             else:
                 tipo = "anotacao"
@@ -179,13 +183,89 @@ def _metadados(reader) -> List[Achado]:
     return achados
 
 
+_ACTUALTEXT = re.compile(rb"/ActualText\s*(<[0-9A-Fa-f\s]*>|\((?:\\.|[^\\)])*\))")
+# Abaixo disso o texto substituto costuma ser ligadura ou hifenizacao ("fi", "ff").
+_MIN_ALFANUM_SUBSTITUTO = 12
+
+
+def _decodificar_string_pdf(bruto: bytes) -> str:
+    if bruto.startswith(b"<"):
+        dados = bytes.fromhex(re.sub(rb"\s", b"", bruto[1:-1]).decode() or "")
+    else:
+        corpo = bruto[1:-1]
+        escapes = {b"n": b"\n", b"r": b"\r", b"t": b"\t", b"(": b"(", b")": b")", b"\\": b"\\"}
+        dados = re.sub(rb"\\(.)", lambda m: escapes.get(m.group(1), m.group(1)), corpo)
+    if dados.startswith(b"\xfe\xff"):
+        return dados[2:].decode("utf-16-be", "replace")
+    return dados.decode("latin-1")
+
+
+def _texto_substituto(reader) -> List[Achado]:
+    """/ActualText: o texto que extratores como o do Poppler entregam no lugar dos glifos."""
+    achados = []
+    for numero, pagina in enumerate(reader.pages, start=1):
+        conteudo = pagina.get_contents()
+        if conteudo is None:
+            continue
+        glifos = None
+        for m in _ACTUALTEXT.finditer(conteudo.get_data()):
+            texto = _decodificar_string_pdf(m.group(1)).strip()
+            if sum(ch.isalnum() for ch in texto) >= _MIN_ALFANUM_SUBSTITUTO:
+                if glifos is None:
+                    # O pypdf ignora o ActualText: le os glifos que a pagina desenha.
+                    glifos = pagina.extract_text() or ""
+                achados.append(Achado("texto_substituto", texto, numero, {"glifos": glifos}))
+    return achados
+
+
+def _metadados_de_imagens(reader) -> List[Achado]:
+    """Comentario, EXIF e XMP dos JPEG embutidos nas paginas."""
+    try:
+        from PIL import Image
+
+        from polar_sentinel.reference.imagem_inspector import metadados_da_imagem
+    except ImportError:
+        return []
+    achados: List[Achado] = []
+    for numero, page in enumerate(reader.pages, start=1):
+        recursos = page.get("/Resources")
+        xobjetos = recursos.get_object().get("/XObject") if recursos is not None else None
+        if xobjetos is None:
+            continue
+        for nome, ref in xobjetos.get_object().items():
+            objeto = ref.get_object()
+            filtro = objeto.get("/Filter")
+            filtros = filtro if isinstance(filtro, list) else [filtro]
+            if objeto.get("/Subtype") != "/Image" or "/DCTDecode" not in [str(f) for f in filtros]:
+                continue
+            try:
+                imagem = Image.open(io.BytesIO(objeto.get_data()))
+            except Exception:  # noqa: BLE001
+                continue
+            for a in metadados_da_imagem(imagem):
+                achados.append(
+                    Achado(
+                        "metadado_de_imagem", a.texto, numero, {**a.detalhe, "imagem": str(nome)}
+                    )
+                )
+    return achados
+
+
 def inspecionar_estrutura(dados: bytes, profundidade: int = 1) -> List[Achado]:
     """Lista os canais fora do texto da pagina. `dados` e o PDF em bytes."""
     from pypdf import PdfReader
 
     reader = PdfReader(io.BytesIO(dados))
     achados: List[Achado] = []
-    for coletor in (_anotacoes, _camadas_desligadas, _javascript_do_documento, _metadados):
+    coletores = (
+        _anotacoes,
+        _camadas_desligadas,
+        _javascript_do_documento,
+        _metadados,
+        _metadados_de_imagens,
+        _texto_substituto,
+    )
+    for coletor in coletores:
         try:
             achados.extend(coletor(reader))
         except Exception as exc:  # noqa: BLE001 - PDF malformado nao derruba a inspecao
