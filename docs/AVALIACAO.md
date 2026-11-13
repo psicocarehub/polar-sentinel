@@ -633,25 +633,29 @@ sobre o corpo da petição.
 ### Lote 3, outras fontes, nunca visto
 
 Para medir as correções fora da distribuição em que foram feitas, um agente
-que não leu o código nem os resultados coletou 280 peças de 31 fontes que não
-estavam nos lotes anteriores: Conjur, MPF, MPAC, Defensorias (ES, MG, BA, CE),
+que não leu o código nem os resultados coletou peças de fontes que não
+estavam nos lotes anteriores: MPF, MPAC, Defensorias (ES, MG, BA, CE),
 seccionais da OAB, sindicatos e associações (Adusp, Sindilegis, Sindipetro,
 Fenajufe, Contee, Fenasps), imprensa (Ponte, Agência Pública, Repórter Brasil,
 CartaCapital, Rota Jurídica) e um escritório, com as mesmas regras de coleta.
-Pesa menos para o STF e mais para o primeiro grau: 135 de primeiro grau, 71
-de tribunal superior, 40 de segundo grau. Dezesseis são modelos de peça com
-lacunas, publicados pela própria instituição, e ficam fora da medida
-principal, decidido antes de medir. Lido uma vez com o código congelado em
-`ae99123`:
+A coleta trazia também 75 peças do Conjur, retiradas porque o `robots.txt` do
+site bloqueia os agentes da Anthropic e declara `ai-train=no` (libera o
+agente que age a pedido do usuário, e o uso aqui é só medida local, mas o
+autor preferiu a leitura restritiva). Ficaram 205 arquivos de 30 fontes. Pesa
+menos para o STF e mais para o primeiro grau: 99 de primeiro grau, 38 de
+tribunal superior, 30 de segundo grau. Doze são modelos de peça com lacunas,
+publicados pela própria instituição, e ficam fora da medida principal,
+decidido antes de medir. Lido uma vez com o código congelado em `ae99123`:
 
 | Recorte | Peças | Sinalizadas | Só atenção |
 | --- | ---: | --- | ---: |
-| **Peças reais (sem os modelos)** | **264** | **10 (3,8%; 2,1% a 6,8%)** | 36 |
-| Sem o Conjur | 193 | 10 (5,2%; 2,8% a 9,3%) | 25 |
-| Advogado privado | 59 | 2 (3,4%; 0,9% a 11,5%) | 7 |
-| Órgão público (MP, Defensoria, AGU) | 112 | 7 (6,2%; 3,1% a 12,3%) | 19 |
-| Entidade | 88 | 1 (1,1%; 0,2% a 6,2%) | 10 |
-| Primeiro grau | 119 | 6 (5,0%; 2,3% a 10,6%) | 22 |
+| **Peças reais (sem os modelos)** | **193** | **10 (5,2%; 2,8% a 9,3%)** | 25 |
+| Órgão público (MP, Defensoria, AGU) | 95 | 7 (7,4%; 3,6% a 14,4%) | 16 |
+| Entidade | 76 | 1 (1,3%; 0,2% a 7,1%) | 8 |
+| Advogado privado | 18 | 2 (11,1%; 3,1% a 32,8%) | 1 |
+| Primeiro grau | 99 | 6 (6,1%; 2,8% a 12,6%) | 19 |
+| Segundo grau | 30 | 3 (10,0%; 3,5% a 25,6%) | 1 |
+| Tribunal superior | 38 | 0 (0% a 9,2%) | 2 |
 
 Nenhuma das dez trazia ordem a IA. As causas:
 
@@ -670,10 +674,13 @@ Nenhuma das dez trazia ordem a IA. As causas:
 * **Texto visível.** Uma contestação da AGU disparou o detector de texto.
 * **Fonte minúscula.** Ementa citada em letra muito pequena num recurso.
 
-O resultado ficou no mesmo patamar do lote 2 antes das correções (4,2%), e o
-recorte de quem mais escreve petição (advogado privado, 3,4%, e primeiro grau,
-5,0%) não foi pior que a média. A taxa de falso positivo em petição real fica,
-então, entre 2% e 7%, e não abaixo de 1% como nos documentos públicos. Em
+O resultado ficou no patamar do lote 2 antes das correções (4,2%). Sem o
+Conjur, sobram só 18 peças de advogado privado, pouco para dizer algo sobre
+elas; nenhuma das 71 peças reais do Conjur, 41 delas de advogado privado,
+tinha sido sinalizada. As peças de tribunal superior não tiveram nenhuma, e as de
+primeiro e segundo grau, que vêm mais de digitalização e de sistema do MP,
+concentram os casos. A taxa de falso positivo em petição real fica, então,
+entre 3% e 9%, e não abaixo de 1% como nos documentos públicos. Em
 quase todos os casos o que dispara é discrepância de verdade entre o que a
 pessoa vê e o que a máquina lê (camada invisível, texto coberto), sem ordem; a
 diferença entre isso e ataque é o conteúdo, e a regra de frase invisível, que

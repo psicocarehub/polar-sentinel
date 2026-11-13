@@ -88,7 +88,7 @@ Imagem, video, audio e autenticidade; atacante adaptativo e peticoes reais.
   * "sem restricao" so conta depois de verbo de resposta;
   * metadado e link pedem ordem alem do termo de IA;
   * numero de pagina coberto conta uma vez.
-  Um terceiro lote, de outras fontes, lido uma vez depois disso: 10 de 264.
+  Um terceiro lote, de outras fontes, lido uma vez depois disso: 10 de 193.
 
 ## 0.5.0
 
