@@ -392,9 +392,11 @@ def inspecionar_video(
         achados.extend(a.achados)
         limites.extend(x for x in a.limites if x not in limites)
 
-    return VideoInspecao(
-        "\n".join(visivel), trechos, achados, duracao_s=duracao, audio=audios, limites=limites
-    )
+    # Cada fonte (legenda, quadro, faixa de audio) e uma fala ou texto a parte;
+    # transcricao nao tem pontuacao, entao a fronteira ganha ponto final, para o
+    # detector nao tomar a faixa seguinte como continuacao da frase.
+    texto = "\n".join(v.rstrip() + ("" if v.rstrip()[-1:] in ".!?:;" else ".") for v in visivel)
+    return VideoInspecao(texto, trechos, achados, duracao_s=duracao, audio=audios, limites=limites)
 
 
 @dataclass

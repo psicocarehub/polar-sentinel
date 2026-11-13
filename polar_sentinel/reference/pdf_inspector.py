@@ -79,6 +79,13 @@ _NO_FILL_OPS = {b"n", b"S", b"s"}
 _ORDER_RE = re.compile(
     r"\b(?:" + _IMPERATIVE + r")\b|\b(?:" + _AI_TERM + r")|\b(?:chat|gpt|chatgpt|inteligencia artificial)\b"
 )
+_IMPERATIVO_RE = re.compile(r"\b(?:" + _IMPERATIVE + r")\b")
+# "Diretriz para sistemas de IA:", "nota ao modelo:": rotulo dirigido a IA.
+_ROTULO_A_IA = re.compile(r"(?:" + _AI_TERM + r"|\bia\b|\bmodelos?\b|\bassistentes?\b)[^.\n:()\[\]|]{0,20}:")
+# Ordem na voz passiva: "deve ser resumida como", "devem ser tratados como".
+_DEVER_DE_LEITURA = re.compile(
+    r"\bdevem?\s+ser\s+(?:resumid|apontad|considerad|tratad|classificad|descrit|lid|"
+    r"interpretad|apresentad|avaliad|ignorad|desconsiderad)\w*")
 # Os mesmos sinais com as palavras partidas ("pet ição", "in teligência"): o
 # texto oculto e comparado tambem sem espacos nem pontuacao. Radicais curtos
 # ("gpt", "llm") ficam de fora, porque aparecem por acaso em blocos de base64.
@@ -291,7 +298,17 @@ def _invisivel_em_imagem(motivo: str, texto: str) -> bool:
 def dirigido_a_ia(texto: str, stage: str = "entrada") -> bool:
     """Ordem com destinatario de IA explicito, para canais onde imperativo e comum."""
     texto = sanitize_with_audit(texto).text
-    return bool(_TERMO_DE_IA.search(fold(texto))) and tem_ordem(texto, stage)
+    dobrado = fold(texto)
+    if not _TERMO_DE_IA.search(dobrado):
+        return False
+    # O termo de IA sozinho nao e ordem: o assunto do processo no PJe pode ser
+    # "uso de inteligencia artificial". Precisa de um imperativo alem dele.
+    cru = fold(texto, collapse=False)
+    for vista in (dobrado, _undo_leet(dobrado), _undo_leet(_collapse(_join_spaced(cru)))):
+        if (_IMPERATIVO_RE.search(vista) or _ORDEM_DE_ADULTERACAO.search(vista)
+                or _ROTULO_A_IA.search(vista) or _DEVER_DE_LEITURA.search(vista)):
+            return True
+    return detect_suspicious_patterns(texto, stage)[0] > 0.2
 
 
 def desofuscado(texto: str) -> str:
@@ -375,7 +392,8 @@ def _sem_repeticao(partes: List[str]) -> List[str]:
     diferentes; somado, viraria frase. Ordem repetida em toda pagina continua
     contando uma vez.
     """
-    limpos = {t: re.sub(r"\s+", " ", fold(t)).strip() for t in partes}
+    # Numero nao distingue: "Pag. 1 de 9" e "Pag. 2 de 9" sao o mesmo rodape.
+    limpos = {t: re.sub(r"\s+", " ", re.sub(r"\d+", "#", fold(t))).strip() for t in partes}
     unicos = sorted({v for v in limpos.values() if v}, key=len, reverse=True)
     mantidos: List[str] = []
     for v in unicos:

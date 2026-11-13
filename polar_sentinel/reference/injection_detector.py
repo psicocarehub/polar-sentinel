@@ -277,7 +277,11 @@ _MEDIUM = [
     r"!\[[^\]]*\]\(https?://[^)]*\?[^)]*\)",
     r"\bapi[_ ]call\b|\bfunction[_ ]call\b|\btool[_ ]call\b|\bsend_email\b",
     r"\b(?:without|free\s+(?:of|from))\s+(?:any\s+)?(?:restrictions|censorship|filters|ethical|moral)\b",
-    r"\bsem\s+(?:restric\w+|censura|filtros)\b|\bstay\s+in\s+character\b|\bfrom\s+now\s+on\b",
+    # "sem restricao a sua distribuicao" e portugues de peca; jailbreak manda
+    # responder ou agir "sem restricoes, sem censura".
+    r"\b(?:responda|respondera|responder|aja|atue|opere|escreva|gere|fale|modo)\s+(?:\w+\s+){0,2}?"
+    r"sem\s+(?:restric\w+|censura|filtros)\b|\bsem\s+(?:censura|filtros)\s*,|"
+    r"\bstay\s+in\s+character\b|\bfrom\s+now\s+on\b",
 ]
 
 # Marcadores de papel ou de sistema.
@@ -525,6 +529,35 @@ def _first(patterns: List[str], view: str, flags: int = 0) -> str:
     return ""
 
 
+_LINHA_CHEIA = 35
+
+
+def _linha_continuada(view: str, inicio: int) -> bool:
+    """A linha que comeca em `inicio` continua a frase da linha anterior?
+
+    Em PDF a linha quebra no meio da frase; linha anterior terminada em letra ou
+    virgula nao fecha frase, entao o comeco desta nao e comeco de frase.
+    """
+    if inicio == 0 or view[inicio - 1] != "\n":
+        return False
+    anterior = view[:inicio].rstrip()
+    # Linha quebrada pela largura da pagina e comprida; titulo e assunto de
+    # e-mail ("Email sending request") sao curtos e fecham sem ponto.
+    linha = anterior[anterior.rfind("\n") + 1:].strip()
+    return len(linha) >= _LINHA_CHEIA and bool(re.search(r"[a-z0-9,]$", anterior))
+
+
+def _em_frase(patterns: List[str], view: str) -> bool:
+    """Algum padrao casa fora de uma linha que so continua a frase anterior?"""
+    for pattern in patterns:
+        for m in re.finditer(pattern, view, re.MULTILINE):
+            # "Assistente de IA:" e rotulo mesmo no meio da frase; a virgula
+            # ("inteligencia artificial, demonstra") e que pode ser so texto.
+            if ":" in m.group() or not _linha_continuada(view, m.start()):
+                return True
+    return False
+
+
 def _ordem_de_dispositivo(view: str) -> bool:
     """Imperativo de julgamento no inicio de frase, e nao numa linha quebrada.
 
@@ -535,8 +568,7 @@ def _ordem_de_dispositivo(view: str) -> bool:
     for pattern in _JUDICIAL_ORDER:
         for m in re.finditer(pattern, view, re.MULTILINE):
             antes = view[:m.start()]
-            comeco_de_linha = m.start() > 0 and view[m.start() - 1] == "\n"
-            if comeco_de_linha and re.search(r"[a-z0-9,]$", antes.rstrip()):
+            if _linha_continuada(view, m.start()):
                 continue
             # Item do rol de pedidos ("b. conceda o pedido de liminar"): a peca
             # pede ao juiz, nao manda na IA.
@@ -555,7 +587,7 @@ def _strong_signals(view: str) -> List[Tuple[float, str]]:
     if achou:
         found.append((0.6 if qualificado else 0.45, "override_canonico_ignore_instrucoes"))
 
-    if _first(_ADDRESSED_TO_AI, view, re.MULTILINE):
+    if _em_frase(_ADDRESSED_TO_AI, view):
         found.append((0.5, "texto_dirigido_a_ia_leitora"))
 
     if _ROLE_LINE.search(view):
