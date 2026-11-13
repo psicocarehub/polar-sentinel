@@ -236,11 +236,20 @@ st.markdown("#### Limites")
 st.markdown(
     "- **Texto escondido no PDF é detectado com precisão.** Nos testes, os dez comandos que "
     "tribunais publicaram, escondidos de três formas, foram sinalizados em 30 de 30 arquivos.\n"
-    "- **Em documento real quase não há alarme falso:** 2 sinalizados em 4.007 decisões, ementas "
-    "e modelos de petição.\n"
+    "- **Em decisões e documentos públicos quase não há alarme falso:** 2 sinalizados em 4.007 "
+    "decisões, ementas e modelos de petição, e nenhum em 438 documentos públicos em PDF.\n"
+    "- **Em petições reais, de 3% a 9% dos arquivos geram alarme.** Em três lotes de petições "
+    "publicadas por entidades, partidos, MP, Defensorias e imprensa, nenhum alarme trazia ordem "
+    "à IA: quase sempre é texto que existe no arquivo e ninguém vê, como a tarja que cobre o CPF "
+    "sem apagá-lo. O alarme pede que alguém olhe o arquivo, não que a petição seja recusada.\n"
     "- **Uma ordem escrita em linguagem comum, sem nada escondido, passa em cerca de metade das "
-    "vezes.** É uma triagem, não uma garantia; ações irreversíveis continuam pedindo revisão humana.\n"
-    "- Fundo feito de imagem, texto atrás de outro objeto e texto em anotações do PDF não são analisados."
+    "vezes.** Quem conhece as regras escapa da sinalização com ordens curtas e secas, mas quase "
+    "sempre deixa um aviso de atenção. É uma triagem, não uma garantia; ações irreversíveis "
+    "continuam pedindo revisão humana.\n"
+    "- **Nesta página o PDF é lido sem desenhar a página**, porque o navegador não roda o "
+    "renderizador nem o leitor de imagem: fundo feito de imagem, texto atrás de figura e PDF "
+    "digitalizado não são analisados. O pacote instalado mede a página desenhada e lê imagem, "
+    "vídeo e áudio."
 )
 st.markdown(
     f'<p class="ps-pequeno">Polar Sentinel {__version__}, código aberto (Apache 2.0). '
