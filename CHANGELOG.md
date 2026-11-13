@@ -2,7 +2,7 @@
 
 Formato baseado em Keep a Changelog. Versionamento semantico.
 
-## 0.6.0 (12/11/2026)
+## 0.6.0 (13/11/2026)
 
 Imagem, video, audio e autenticidade; atacante adaptativo e peticoes reais.
 
