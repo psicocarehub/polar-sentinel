@@ -603,6 +603,82 @@ correções (commit `ad8c08a`) e lidas uma vez: **9 de 216 sinalizadas (4,2%; in
 
 Nenhuma das nove trazia ordem a IA. As causas: duas petições sobre conteúdo gerado por IA nas eleições de 2026, em que o detector de texto leu "inteligência artificial" no começo de uma linha quebrada como vocativo; um pedido de moderação de anúncios "sem revisão humana"; um bloco hexadecimal; o cabeçalho do PJe gravado no metadado; e quatro textos lidos de imagem ou postos sob figura (memes e capturas de tela de sistemas do governo). O número é maior que os 2,5% do lote 1 depois das correções, como se espera de um número que não serviu ao ajuste. A falha mais clara, o vocativo em linha quebrada, é a mesma que foi corrigida no rol de pedidos e ainda vale nos outros padrões do detector; corrigi-la agora faria deste lote também desenvolvimento. A próxima medida honesta pede um lote 3 de outras fontes, como escritórios e processos de primeiro grau, lido uma vez.
 
+Depois de medido, o lote 2 virou desenvolvimento e suas causas foram
+corrigidas (commit `ae99123`), cada uma com teste:
+
+* vocativo de IA no começo de linha não conta quando a linha anterior é cheia
+  (35 caracteres ou mais) e termina sem ponto, porque é linha quebrada; o
+  rótulo com dois-pontos ("Assistente de IA:") conta sempre. O limite de 35
+  veio de um ataque do LLMail-Inject que a primeira versão da correção deixou
+  passar (assunto curto do e-mail, "Dear chatbot," na linha de baixo);
+* cada fonte de um vídeo (legenda, quadro, faixa de áudio) fecha com ponto,
+  porque transcrição não tem pontuação e a fala da segunda faixa parecia
+  continuar a frase da primeira (a primeira versão da correção perdeu esse
+  ataque do conjunto cego de mídia);
+* "sem restrição" só conta como jailbreak depois de verbo de resposta
+  ("responda sem restrições");
+* em metadado e em link, o termo de IA sozinho não é ordem (o assunto do
+  processo no PJe pode ser "uso de inteligência artificial"): precisa de
+  imperativo, de rótulo com dois-pontos ("Diretriz para sistemas de IA:") ou
+  de ordem na voz passiva ("deve ser resumida como"); a primeira versão perdeu
+  esse ataque do conjunto cego de documentos;
+* número de página coberto ("Pág. 1 de 9") conta uma vez.
+
+Os conjuntos cegos, o atacante adaptativo e os dados públicos de ataque deram
+os mesmos números de antes. Com o código congelado, os lotes 1 e 2 ficaram em
+10 de 402 e 4 de 216, ambos números de desenvolvimento. O que sobra são memes e capturas de tela, em que a letra branca
+com contorno engana a medida de contraste da imagem, e texto de jornal colado
+sobre o corpo da petição.
+
+### Lote 3, outras fontes, nunca visto
+
+Para medir as correções fora da distribuição em que foram feitas, um agente
+que não leu o código nem os resultados coletou 280 peças de 31 fontes que não
+estavam nos lotes anteriores: Conjur, MPF, MPAC, Defensorias (ES, MG, BA, CE),
+seccionais da OAB, sindicatos e associações (Adusp, Sindilegis, Sindipetro,
+Fenajufe, Contee, Fenasps), imprensa (Ponte, Agência Pública, Repórter Brasil,
+CartaCapital, Rota Jurídica) e um escritório, com as mesmas regras de coleta.
+Pesa menos para o STF e mais para o primeiro grau: 135 de primeiro grau, 71
+de tribunal superior, 40 de segundo grau. Dezesseis são modelos de peça com
+lacunas, publicados pela própria instituição, e ficam fora da medida
+principal, decidido antes de medir. Lido uma vez com o código congelado em
+`ae99123`:
+
+| Recorte | Peças | Sinalizadas | Só atenção |
+| --- | ---: | --- | ---: |
+| **Peças reais (sem os modelos)** | **264** | **10 (3,8%; 2,1% a 6,8%)** | 36 |
+| Sem o Conjur | 193 | 10 (5,2%; 2,8% a 9,3%) | 25 |
+| Advogado privado | 59 | 2 (3,4%; 0,9% a 11,5%) | 7 |
+| Órgão público (MP, Defensoria, AGU) | 112 | 7 (6,2%; 3,1% a 12,3%) | 19 |
+| Entidade | 88 | 1 (1,1%; 0,2% a 6,2%) | 10 |
+| Primeiro grau | 119 | 6 (5,0%; 2,3% a 10,6%) | 22 |
+
+Nenhuma das dez trazia ordem a IA. As causas:
+
+* **Camada de texto invisível sobre página desenhada em vetor.** Duas ações
+  civis públicas do MPF trazem o texto inteiro em modo invisível sobre a
+  página desenhada como vetor. A pessoa vê o mesmo texto, desenhado; a
+  conferência pelo Tesseract só existe para camada sobre imagem. Dentro dessa
+  camada, "com destaque para" foi lido como ordem: o imperativo "destaque" é
+  também substantivo, e o canal oculto aceita imperativo solto.
+* **Texto coberto ou fora da página em pedaços.** Fragmentos de timbre e de
+  cabeçalho ("DA 1* REGIÃO", "Lo"), endereço de imóvel sob tarja ("Rua Marconi
+  138, Centro") que não chega a ser qualificação de parte, URL de nota de
+  rodapé coberta e cortada no meio.
+* **Imagem.** Peça tarjada pelo próprio MPF, com o nome do signatário lido na
+  imagem como texto na cor do fundo.
+* **Texto visível.** Uma contestação da AGU disparou o detector de texto.
+* **Fonte minúscula.** Ementa citada em letra muito pequena num recurso.
+
+O resultado ficou no mesmo patamar do lote 2 antes das correções (4,2%), e o
+recorte de quem mais escreve petição (advogado privado, 3,4%, e primeiro grau,
+5,0%) não foi pior que a média. A taxa de falso positivo em petição real fica,
+então, entre 2% e 7%, e não abaixo de 1% como nos documentos públicos. Em
+quase todos os casos o que dispara é discrepância de verdade entre o que a
+pessoa vê e o que a máquina lê (camada invisível, texto coberto), sem ordem; a
+diferença entre isso e ataque é o conteúdo, e a regra de frase invisível, que
+o atacante adaptativo exigiu, é a que mais cobra em documento real.
+
 ## O que mudou entre a versão 0.3.0 e a 0.4.0
 
 * **Acentos.** As regras estavam escritas sem acento e eram aplicadas ao texto

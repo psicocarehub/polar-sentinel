@@ -52,6 +52,7 @@ dela o conjunto vira desenvolvimento.
 | Atacante que conhece o código: tentativas válidas sinalizadas | **21%** | 77%, e 1% sem nenhum aviso |
 | Petições reais de entidades, partidos e imprensa sinalizadas por engano (402) | **59** (14,7%) | 10 (2,5%) |
 | Petições nunca vistas, depois das correções (216) | **9** (4,2%) | não ajustado |
+| Petições de outras fontes, mais primeiro grau e advocacia privada (264) | **10** (3,8%) | não ajustado |
 
 A Justiça brasileira já lê com IA texto e PDF de peças e a transcrição de
 audiências (resumida por modelo em vários tribunais); a imagem entra pelo
@@ -67,7 +68,10 @@ Quatro coisas para ler nessas tabelas:
   sinalizados em 4.007 textos e nenhum em 438 documentos públicos. Petições
   reais deram 59 em 402 na primeira passada: tarja que não apaga o CPF, timbre
   coberto, linguagem de peça lida como comando. Nenhuma trazia ordem a IA.
-  Corrigido, um lote nunca visto teve 9 sinalizados em 216 (4,2%), sobretudo petições que falam da própria IA.
+  Corrigido, um lote nunca visto teve 9 sinalizados em 216 (4,2%), e um terceiro,
+  de outras fontes, 10 em 264 (3,8%). Em petição real o falso positivo fica
+  entre 2% e 7%, quase sempre texto que a máquina lê e a pessoa não vê, sem
+  ordem.
 * **Quem conhece as regras passa, mas quase nunca em silêncio.** O atacante
   adaptativo escapou da sinalização nos dez comandos reais; depois de três
   rodadas de regras de forma, o que escapa são ordens curtas e secas, e o

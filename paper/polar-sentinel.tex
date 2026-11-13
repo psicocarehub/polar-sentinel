@@ -138,12 +138,15 @@ publicadas por entidades, partidos e imprensa, a primeira passada
 sinalizou 59 por engano (14,7\%), sobretudo por tarjas que não apagam o
 dado pessoal, timbres cobertos e linguagem de peça que o detector
 confundia com comando; corrigidas essas causas, um segundo lote nunca
-visto de 216 petições teve 9 sinalizadas (4,2\%), nenhuma com ordem a
-IA. A conclusão prática é que a forma do ataque é mensurável e barata de
-detectar, que regras públicas são contornadas por quem as lê e por isso
-cada regra nova precisa ser medida contra o atacante seguinte, e que
-nada disso substitui a aprovação humana antes de qualquer ato
-irreversível.
+visto teve 9 de 216 (4,2\%) e, depois de nova correção, um terceiro, de
+outras fontes e com mais primeiro grau e advocacia privada, teve 10 de
+264 (3,8\%), nenhuma com ordem a IA: em petição real o falso positivo
+fica entre 2\% e 7\%, e quase sempre é discrepância de verdade sem
+ordem, como a camada de texto invisível ou o texto coberto. A conclusão
+prática é que a forma do ataque é mensurável e barata de detectar, que
+regras públicas são contornadas por quem as lê e por isso cada regra
+nova precisa ser medida contra o atacante seguinte, e que nada disso
+substitui a aprovação humana antes de qualquer ato irreversível.
 \end{abstract}
 
 \subsection{1. O problema}\label{o-problema}
@@ -347,7 +350,12 @@ sociedade civil, partidos e imprensa jurídica e política, só arquivos
 linkados em página publicada ou em índice público. O lote 1 tem 402
 arquivos lidos (10.732 páginas, 126 com assinatura digital); o lote 2,
 com 216 lidos de 217 baixados, foi separado antes de qualquer leitura,
-baixado depois de congeladas as correções e lido uma vez.
+baixado depois de congeladas as correções e lido uma vez. O lote 3 tem
+264 peças de 31 outras fontes (Conjur, MPF, Defensorias, OAB,
+sindicatos, imprensa), metade de primeiro grau e 59 de advocacia
+privada, coletadas por um agente que não leu o código nem os resultados
+e lidas uma vez depois de congeladas as correções do lote 2; dezesseis
+modelos de peça com lacunas ficaram fora, decidido antes de medir.
 
 \textbf{Comandos reais.} Os dez textos que tribunais e imprensa jurídica
 publicaram entre aspas em 2026, com a fonte de cada um, escritos também
@@ -410,6 +418,8 @@ Petições reais, lote 1, primeira passada & 402 & 59 (14,7\%; 11,6\% a
 Petições, lote 1, depois das correções (desenvolvimento) & 402 & 10
 (2,5\%) \\
 Petições, lote 2, nunca visto & 216 & 9 (4,2\%; 2,2\% a 7,7\%) \\
+Petições, lote 3, outras fontes, nunca visto & 264 & 10 (3,8\%; 2,1\% a
+6,8\%) \\
 \end{longtable}
 }
 
@@ -447,7 +457,19 @@ textos lidos de imagem ou postos sob figura (memes e capturas de tela de
 sistemas do governo). É mais que os 2,5\% do lote 1 corrigido, como se
 espera de um número que não serviu ao ajuste, e mostra que petição sobre
 a própria IA, comum nas ações eleitorais de 2026, ainda confunde o
-detector de texto. A análise custa 0,09 segundo por página de documento,
+detector de texto. Essas causas viraram regra, com teste, e os conjuntos
+cegos, o atacante e os dados públicos não mudaram; duas das correções
+perderam um ataque cego na primeira versão (vocativo depois de assunto
+curto de e-mail, fala de uma segunda faixa de áudio) e foram refeitas. O
+lote 3, de outras fontes, teve 10 de 264 (3,8\%; 2,1\% a 6,8\%), com
+advocacia privada em 2 de 59 e primeiro grau em 6 de 119. Nenhuma trazia
+ordem a IA: duas ações do MPF com o texto inteiro numa camada invisível
+sobre a página desenhada em vetor, que a conferência de OCR, feita para
+camada sobre imagem, não alcança; pedaços de timbre, endereço e nota de
+rodapé cobertos; uma peça tarjada lida na imagem; uma contestação da AGU
+no detector de texto; uma ementa em letra minúscula. A regra de frase
+invisível, que o atacante adaptativo exigiu, é a que mais cobra em
+documento real. A análise custa 0,09 segundo por página de documento,
 0,42 segundo por página com leitura de imagem e cerca de 19 segundos por
 minuto de mídia, num computador de mesa sem GPU.
 
@@ -704,11 +726,13 @@ medida de falso positivo em escala, e os ataques de aparência em PDF
 assinado descritos na literatura não foram reproduzidos. A amostra de
 petições pesa para o STF, para ações eleitorais e casos políticos e para
 documentos de entidade e partido; quase não tem contestação cível comum
-nem processo de família, que é sigiloso. Os dois lotes vêm das mesmas
-fontes, então o lote 2 mede a generalização dentro dessa distribuição,
-não a de um cartório. O código e os conjuntos de teste foram escritos
-com a ajuda de um assistente de programação por IA e revisados pelo
-autor.
+nem processo de família, que é sigiloso. Os lotes 1 e 2 vêm das mesmas
+fontes; o lote 3 vem de outras, com mais primeiro grau e advocacia
+privada, mas ainda é o que alguém escolheu publicar, não a fila de um
+cartório, e as colunas de tipo, autor e instância foram classificadas
+automaticamente, com erro estimado de 15\% a 25\%. O código e os
+conjuntos de teste foram escritos com a ajuda de um assistente de
+programação por IA e revisados pelo autor.
 
 \textbf{Disponibilidade.} Código, comandos reais com as fontes,
 conjuntos cegos, atacante adaptativo, levantamento por formato e

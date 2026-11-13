@@ -82,6 +82,13 @@ Imagem, video, audio e autenticidade; atacante adaptativo e peticoes reais.
     captura de tela) precisa formar frase, e ordem em imagem de contraste
     baixo precisa ser dirigida a IA;
   * glifo repetido ("0 0 0") deixa de contar como letras soltas.
+* Falsos positivos de um segundo lote de 216 peticoes (9 sinalizadas):
+  * vocativo de IA em linha quebrada nao conta, salvo rotulo com dois-pontos;
+  * cada fonte de video fecha com ponto antes do detector;
+  * "sem restricao" so conta depois de verbo de resposta;
+  * metadado e link pedem ordem alem do termo de IA;
+  * numero de pagina coberto conta uma vez.
+  Um terceiro lote, de outras fontes, lido uma vez depois disso: 10 de 264.
 
 ## 0.5.0
 
